@@ -1,0 +1,13 @@
+[project]
+name = "value-task"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "experiment",
+    "pyserial>=3.5",
+]
+
+[tool.uv.sources]
+experiment = { git = "https://github.com/jselvan/experiment.git", rev = "lab" }
