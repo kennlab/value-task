@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Experiment Controller</title>
+    <script src="{{ url_for('static', filename='socketio.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='plotly.min.js') }}"></script>
+</head>
+<body>
+  <h1>Experiment Controller</h1>
+  <img src="/screen" width="640">
+  <h2>Controls</h2>
+  <button onclick="sendCommand({'do': 'reward'})">Good Monkey!</button>
+  <button onclick="sendCommand({'do': 'quit'})">Stop Task</button>
+  <button onclick="sendCommand({'do': 'pump_on'})">Pump On</button>
+  <button onclick="sendCommand({'do': 'pump_off'})">Pump Off</button>
+
+  <h2>Update Variables</h2>
+  <form id="vars-form">
+    <label for="default_reward_duration">Reward Duration:</label>
+    <input type="number" id="default_reward_duration" name="default_reward_duration" step="0.1" value="0.5" />
+    <label for="size">Size:</label>
+    <input type="text" id="size" name="size" value="1080, 1920" />
+    <button type="submit">Update Variables</button>
+  </form>
+
+  <div id="info">
+    <h2>Current Trial Info</h2>
+    <p><b>Trial ID:</b> <span id="trialid"></span></p>
+    <p><b>Condition:</b> <span id="condition"></span></p>
+    <p><b>Block:</b> <span id="block"></span></p>
+    <p><b>Block Number:</b> <span id="block_number"></span></p>
+  </div>
+
+  <div id="summary">
+    <h2>Block Summary</h2>
+    <table id="summary-table">
+      <thead>
+        <tr>
+          <th>Block Number</th>
+          <th>Block</th>
+          <th>Outcome: Correct</th>
+          <th>Outcome: incorrect</th>
+          <th>Outcome: Timeout</th>
+          <th>Optimal: True</th>
+          <th>Optimal: False</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+
+  <p id="response"></p>
+</body>
+<script>
+  var socket = io.connect("http://" + document.domain + ":" + location.port);
+
+  function sendCommand(action) {
+      socket.emit('command', action);
+  }
+  socket.on('response', function(data) {
+      document.getElementById("response").innerText = data.message;
+  });
+
+  function updateDisplay(data) {
+    if (!data || Object.keys(data).length === 0) return;
+    // --- Get the latest trial ---
+    const lastKey = Math.max(...Object.keys(data).map(k => parseInt(k)));
+    const lastTrial = data[lastKey];
+    document.getElementById('trialid').textContent = lastTrial.trialid ?? 'N/A';
+    document.getElementById('condition').textContent = lastTrial.condition ?? 'N/A';
+    document.getElementById('block').textContent = lastTrial.block ?? 'N/A';
+    document.getElementById('block_number').textContent = lastTrial.block_number ?? 'N/A';
+    // --- Aggregate counts per block ---
+    const summary = {};
+    for (const key in data) {
+      const trial = data[key];
+      const b = trial.block_number;
+      if (!summary[b]) {
+        summary[b] = { block: trial.block, correct: 0, incorrect: 0, timeout: 0 };
+      }
+      if (trial.outcome) {
+        if (trial.outcome === 'correct') summary[b].correct++;
+        else if (trial.outcome === 'incorrect') summary[b].incorrect++;
+        else if (trial.outcome === 'timeout') summary[b].timeout++;
+      }
+    }
+    // --- Update table ---
+    const tbody = document.querySelector('#summary-table tbody');
+    tbody.innerHTML = '';
+    for (const b in summary) {
+      const s = summary[b];
+      const row = `<tr>
+        <td>${b}</td>
+        <td>${s.block}</td>
+        <td>${s.correct}</td>
+        <td>${s.incorrect}</td>
+        <td>${s.timeout}</td>
+      </tr>`;
+      tbody.innerHTML += row;
+    }
+    tbody.innerHTML += `<tr>
+      <td colspan="2"><b>Total</b></td>
+      <td><b>${Object.values(summary).reduce((a,b) => a + b.correct, 0)}</b></td>
+      <td><b>${Object.values(summary).reduce((a,b) => a + b.incorrect, 0)}</b></td>
+      <td><b>${Object.values(summary).reduce((a,b) => a + b.timeout, 0)}</b></td>
+    </tr>`;
+    // updatePlot(data);
+  }
+
+  function fetchBehaviour() {
+      fetch('/behaviour_summary')
+      .then(response=>response.json())
+      .then(data => {
+          updateDisplay(data)
+      })
+  }
+  
+  // --- Variables update form handler ---
+  (function() {
+    const varsForm = document.getElementById('vars-form');
+    if (!varsForm) return;
+    varsForm.addEventListener('submit', function(e) {
+      e.preventDefault();
+      const formData = new FormData(varsForm);
+      const variables = {};
+      for (const [key, value] of formData.entries()) {
+        const trimmed = (value || '').toString().trim();
+        if (trimmed.includes(',')) {
+          // Handle as array
+          const arr = trimmed.split(',').map(item => {
+            const trimmed_item = item.trim();
+            const num = Number(trimmed_item);
+            return (trimmed_item !== '' && !isNaN(num)) ? num : trimmed_item;
+          });
+          variables[key] = arr;
+          continue;
+        }
+        const num = Number(trimmed);
+        variables[key] = (trimmed !== '' && !isNaN(num)) ? num : value;
+      }
+      sendCommand({ do: 'update_variables', variables: variables });
+    });
+  })();
+    
+  socket.on('trial_end', function(data) {
+      fetchBehaviour()
+  })
+  fetchBehaviour()
+</script>
+</html>

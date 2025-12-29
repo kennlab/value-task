@@ -2,16 +2,16 @@ from experiment.trial import Trial, TrialResult
 from experiment.experiments.adapters import ImageAdapter, TouchAdapter, RewardAdapter, TimeCounter
 from experiment.experiments.scene import Scene
 from experiment.util.bbox import T_BBOX_SPEC
-from typing import Optional, Tuple
+from typing import Optional, Tuple, Dict, Any, Literal
 
 INTERPULSE_INTERVAL = 0.2
 class ForcedChoiceTrial(Trial):
     DEFAULT_MAGNITUDE_MAPPING = {
-        1: 1,
-        2: 1.5,
-        3: 2,
-        4: 2.5,
-        5: 3,
+        1: {'duration': 1},
+        2: {'duration': 1.5},
+        3: {'duration': 2},
+        4: {'duration': 2.5},
+        5: {'duration': 3},
     }
     backgrounds = {
         'correct': (0, 255, 0),
@@ -23,7 +23,7 @@ class ForcedChoiceTrial(Trial):
         stimulus: str, 
         magnitude: int, 
         loc: Tuple[int, int],
-        magnitude_mapping=None, 
+        magnitude_mapping: Optional[Dict[Any, Dict[Literal['duration' , 'interpulse_interval', 'n_pulses'], int | float]]]=None, 
         duration: float=5.0,
         size: Tuple[int, int]=(200, 200), 
         bbox: Optional[T_BBOX_SPEC]=None,
@@ -69,9 +69,24 @@ class ForcedChoiceTrial(Trial):
             center=center
         )
 
+    def get_reward_scene(self, mgr, reward_params) -> Scene:
+        rew = RewardAdapter.from_manager(
+            manager=mgr, 
+            channels=self.reward_channels,
+            progress_params=dict(
+                position=self.center,
+                size=(400, 50),
+                colour=(0, 0, 0),
+                gap=10
+            ),
+            **reward_params
+        )
+        reward_scene = Scene(mgr, rew, background=self.backgrounds['correct'])
+        return reward_scene
+
     def run(self, mgr) -> TrialResult:
-        reward_duration = self.magnitude_mapping[self.magnitude]
-        data = {"stimulus": self.stimulus, "magnitude": self.magnitude, "location": self.loc, "reward_duration": reward_duration}
+        reward_params = self.magnitude_mapping[self.magnitude]
+        data = {"stimulus": self.stimulus, "magnitude": self.magnitude, "location": self.loc, "reward_params": reward_params}
 
         target = ImageAdapter(
             image=self.stimulus,
@@ -84,20 +99,7 @@ class ForcedChoiceTrial(Trial):
             items={'target': target},
         )
         scene = Scene(mgr, adapter=tc)
-        rew = RewardAdapter.from_manager(
-            manager=mgr,
-            duration=reward_duration,
-            channels=self.reward_channels,
-            n_pulses=1,
-            interpulse_interval=INTERPULSE_INTERVAL,
-            progress_params=dict(
-                position=self.center,
-                size=(400, 50),
-                colour=(0, 0, 0),
-                gap=10
-            )
-        )
-        reward_scene = Scene(mgr, rew, background=self.backgrounds['correct'])
+        reward_scene = self.get_reward_scene(mgr, reward_params)
         incorrect_scene = Scene(mgr, adapter=TimeCounter(self.error_duration), background=self.backgrounds['incorrect'])
         timeout_scene = Scene(mgr, adapter=TimeCounter(self.timeout_duration), background=self.backgrounds['timeout'])
         outcome_scenes = {
@@ -129,4 +131,5 @@ class ForcedChoiceTrial(Trial):
         outcome_scene.run()
         if outcome_scene.quit:
             res.continue_session = False
+        mgr.record(**data, outcome=res.outcome)
         return res

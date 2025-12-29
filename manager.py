@@ -4,14 +4,24 @@ from collections import ChainMap
 
 
 DEFAULT_DISPLAY_SETTINGS = {
-    'size': (1366, 768),
-    'fullscreen': False,
+    'size': (1080, 1920),
+    'fullscreen': True,
     'display': 0
 }
 DEFAULT_REMOTE_SERVER = {
     'enabled': True,
-    'show': True,
+    'show': False,
     'template_path': Path('server').absolute(),
+}
+DEFAULT_IO_SETTINGS = {
+    'reward': {
+        'type': 'ISMATEC_SERIAL',
+        'address': '/dev/ttyACM0',
+        'channels': [
+            {'channel': '2', 'clockwise': True, 'speed': 100},
+            {'channel': '3', 'clockwise': True, 'speed': 100}
+        ]
+    }
 }
 def load_manager(config):
     monkey = config.get('name', None)
@@ -29,29 +39,17 @@ def load_manager(config):
     remote_server_settings = config.get('remote_server', {})
     remote_server_config = dict(ChainMap(remote_server_settings, DEFAULT_REMOTE_SERVER))
 
-    strict_mode = config.get('strict_mode', True)
+    config['strict_mode'] = config.get('strict_mode', True)
+    config['display'] = display_settings
+    config['background'] = background
+    config['remote_server'] = remote_server_config
+    config['io'] = config.get('io', DEFAULT_IO_SETTINGS)
+    config['valid_times'] = config.get('valid_times', [
+        {'start': '08:00', 'end': '18:00'},
+    ])
 
     mgr = PygameManager(
         data_directory=data_directory,
-        config={
-            'strict_mode': strict_mode,
-            'display': display_settings,
-            'background': background,
-            'remote_server': remote_server_config,
-            'io': {
-                'reward': {
-                    'type': 'ISMATEC_SERIAL',
-                    'address': 'COM5',
-                    'channels': [
-                        {'channel': '2', 'clockwise': True, 'speed': 100},
-                        {'channel': '3', 'clockwise': True, 'speed': 100}
-                    ]
-                }
-            },
-            'valid_times': [
-                {'start': '09:00', 'end': '12:00'},
-                {'start': '13:00', 'end': '17:00'}
-            ]
-        }
+        config=config
     )
     return mgr

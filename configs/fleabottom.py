@@ -10,12 +10,20 @@ config: Dict[str, Any] = dict(
 )
 
 magnitudes = range(1, 6)
-reward_durations = np.arange(5) * 0.5 + 1.5
-config['magnitude_mapping'] = dict(zip(magnitudes, reward_durations))
+reward_duration = 1  # in seconds
+interpulse_interval = 0.2  # in seconds
+config['magnitude_mapping'] = {
+    mag: {
+        'n_pulses': mag, 
+        'duration': reward_duration, 
+        'interpulse_interval': interpulse_interval
+    } 
+    for mag in magnitudes
+}
 images = [f'stimuli/aada{chr(97+i)}.png' for i in range(5)]
 config['items'] = dict(zip(magnitudes, images))
 
-CENTER = (640, 360)
+CENTER = 1080//2, 1920//2
 OFFSET = 250
 LEFT = (CENTER[0] - OFFSET, CENTER[1])
 RIGHT = (CENTER[0] + OFFSET, CENTER[1])
@@ -48,13 +56,20 @@ config['conditions'] = {**forced_choice_trials, **two_afc_trials}
 # design the block structure
 ## first we will have blocks of forced choice trials in 10 block trials at a given magnitude level
 blocks = {}
-for i, mag in enumerate(magnitudes):
+magnitudes_custom_order = [3, 1, 5, 2, 4]
+for i, mag in enumerate(magnitudes_custom_order):
     blocks[i] = dict(
         conditions=[f'f{mag}left', f'f{mag}right'],
-        length=10,
+        length=5,
         retry={'timeout': True},
     )
-## then we will have blocks of 2AFC trials mixing all magnitude levels, starting with easy trials
+# then one block mixing all forced choice trials
+blocks[len(blocks)] = dict(
+    conditions=[f'f{mag}left' for mag in magnitudes] + [f'f{mag}right' for mag in magnitudes],
+    length=50,
+    retry={'timeout': True},
+)
+# then we will have blocks of 2AFC trials mixing all magnitude levels, starting with easy trials
 for value_difference in range(4, 0, -1):
     condition_list = []
     for option1 in magnitudes:

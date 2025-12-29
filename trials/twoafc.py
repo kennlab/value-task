@@ -7,11 +7,11 @@ from typing import Optional, Tuple
 INTERPULSE_INTERVAL = 0.2
 class TwoAFCTrial(Trial):
     DEFAULT_MAGNITUDE_MAPPING = {
-        1: 1,
-        2: 1.5,
-        3: 2,
-        4: 2.5,
-        5: 3,
+        1: {'duration': 1},
+        2: {'duration': 1.5},
+        3: {'duration': 2},
+        4: {'duration': 2.5},
+        5: {'duration': 3},
     }
     backgrounds = {
         'correct': (0, 255, 0),
@@ -69,30 +69,28 @@ class TwoAFCTrial(Trial):
             center=center
         )
 
-    def get_reward_scene(self, mgr, reward_duration) -> Scene:
+    def get_reward_scene(self, mgr, reward_params) -> Scene:
         rew = RewardAdapter.from_manager(
-            manager=mgr,
-            duration=reward_duration,
+            manager=mgr, 
             channels=self.reward_channels,
-            n_pulses=1,
-            interpulse_interval=INTERPULSE_INTERVAL,
             progress_params=dict(
                 position=self.center,
                 size=(400, 50),
                 colour=(0, 0, 0),
                 gap=10
-            )
+            ),
+            **reward_params
         )
         reward_scene = Scene(mgr, rew, background=self.backgrounds['correct'])
         return reward_scene
 
     def run(self, mgr) -> TrialResult:
-        reward_durations = [self.magnitude_mapping[mag] for mag in self.magnitudes]
+        reward_params = [self.magnitude_mapping[mag] for mag in self.magnitudes]
         data = {
             "options": self.options, 
             "magnitudes": self.magnitudes, 
             "locations": self.locs, 
-            "reward_durations": reward_durations
+            "reward_params": reward_params
         }
         targets = {
             'option1': ImageAdapter(
@@ -114,6 +112,8 @@ class TwoAFCTrial(Trial):
         )
         scene = Scene(mgr, adapter=tc)
 
+        if data['magnitudes'][0] > data['magnitudes'][1]:
+            correct_choice = 'option1'
         scene.run()
         if scene.quit:
             return TrialResult(
@@ -121,10 +121,15 @@ class TwoAFCTrial(Trial):
                 outcome="quit", 
                 data=data
             )
-        elif tc.chosen == 'target':
+        elif tc.chosen in ['option1', 'option2']:
+            if tc.chosen == correct_choice:
+                outcome = 'correct'
+            else:
+                outcome = 'incorrect'
+            data['chosen'] = tc.chosen
             res = TrialResult(
                 continue_session=True, 
-                outcome="correct", 
+                outcome=outcome,
                 data=data
             )
         else:
@@ -133,17 +138,17 @@ class TwoAFCTrial(Trial):
                 outcome="timeout", 
                 data=data
             )
-
-        reward_scene = self.get_reward_scene(mgr, reward_durations[0] if tc.chosen == 'option1' else reward_durations[1])
-        incorrect_scene = Scene(mgr, adapter=TimeCounter(self.error_duration), background=self.backgrounds['incorrect'])
+        reward_scene = self.get_reward_scene(mgr, reward_params[0] if tc.chosen == 'option1' else reward_params[1])
         timeout_scene = Scene(mgr, adapter=TimeCounter(self.timeout_duration), background=self.backgrounds['timeout'])
         outcome_scenes = {
             'correct': reward_scene,
-            'incorrect': incorrect_scene,
+            'incorrect': reward_scene,
             'timeout': timeout_scene
         }
         outcome_scene = outcome_scenes[res.outcome]
         outcome_scene.run()
         if outcome_scene.quit:
             res.continue_session = False
+            
+        mgr.record(**data, outcome=res.outcome)
         return res
