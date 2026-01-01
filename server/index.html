@@ -15,6 +15,7 @@
   <button onclick="sendCommand({'do': 'quit'})">Stop Task</button>
   <button onclick="sendCommand({'do': 'pump_on'})">Pump On</button>
   <button onclick="sendCommand({'do': 'pump_off'})">Pump Off</button>
+  <button id="download-latest" onclick="downloadLatestBehaviour()">Download Latest Behaviour</button>
 
   <h2>Update Variables</h2>
   <form id="vars-form">
@@ -116,6 +117,33 @@
       .then(data => {
           updateDisplay(data)
       })
+  }
+  
+  function downloadLatestBehaviour() {
+      fetch('/behaviour_summary')
+        .then(response => response.json())
+        .then(data => {
+          if (!data || Object.keys(data).length === 0) {
+            alert('No behaviour data available to download.');
+            return;
+          }
+          const keys = Object.keys(data).map(k => parseInt(k)).filter(n => !isNaN(n));
+          const filename = `behaviour_latest.json`;
+          const jsonStr = JSON.stringify(data, null, 2);
+          const blob = new Blob([jsonStr], { type: 'application/json' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = filename;
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+          URL.revokeObjectURL(url);
+        })
+        .catch(err => {
+          console.error('Error fetching behaviour for download', err);
+          alert('Error downloading behaviour');
+        });
   }
   
   // --- Variables update form handler ---
