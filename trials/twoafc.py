@@ -28,7 +28,8 @@ class TwoAFCTrial(Trial):
         size: Tuple[int, int]=(200, 200), 
         bbox: Optional[T_BBOX_SPEC]=None,
         reward_channels: Tuple[int, ...]=(1, 2),
-        center=CENTER
+        center=CENTER,
+        cue_incorrect: bool = False
     ):
         super().__init__()
         self.options = options
@@ -45,6 +46,7 @@ class TwoAFCTrial(Trial):
         self.error_duration = 2.0
         self.timeout_duration = 2.0
         self.center = center
+        self.cue_incorrect = cue_incorrect
     
     @classmethod
     def from_config(cls, config: dict) -> 'TwoAFCTrial':
@@ -57,6 +59,7 @@ class TwoAFCTrial(Trial):
         bbox = config.get('bbox', None)
         reward_channels = tuple(config.get('reward_channels', (1, 2)))
         center = tuple(config['locations'].get('center', cls.CENTER))
+        cue_incorrect = config.get('cue_incorrect', False)
         return cls(
             options=options,
             magnitudes=magnitudes,
@@ -66,10 +69,11 @@ class TwoAFCTrial(Trial):
             size=size,
             bbox=bbox,
             reward_channels=reward_channels,
-            center=center
+            center=center,
+            cue_incorrect=cue_incorrect
         )
 
-    def get_reward_scene(self, mgr, reward_params) -> Scene:
+    def get_reward_scene(self, mgr, reward_params, background) -> Scene:
         rew = RewardAdapter.from_manager(
             manager=mgr, 
             channels=self.reward_channels,
@@ -81,7 +85,7 @@ class TwoAFCTrial(Trial):
             ),
             **reward_params
         )
-        reward_scene = Scene(mgr, rew, background=self.backgrounds['correct'])
+        reward_scene = Scene(mgr, rew, background=background)
         return reward_scene
 
     def run(self, mgr) -> TrialResult:
@@ -138,11 +142,26 @@ class TwoAFCTrial(Trial):
                 outcome="timeout", 
                 data=data
             )
-        reward_scene = self.get_reward_scene(mgr, reward_params[0] if tc.chosen == 'option1' else reward_params[1])
-        timeout_scene = Scene(mgr, adapter=TimeCounter(self.timeout_duration), background=self.backgrounds['timeout'])
+
+        chosen_reward = reward_params[0] if tc.chosen == 'option1' else reward_params[1]
+        reward_scene_correct = self.get_reward_scene(
+            mgr, 
+            chosen_reward, 
+            background=self.backgrounds['correct']
+        )
+        reward_scene_incorrect = self.get_reward_scene(
+            mgr, 
+            chosen_reward, 
+            background=self.backgrounds['incorrect'] if self.cue_incorrect else self.backgrounds['correct']
+        )
+        timeout_scene = Scene(
+            mgr, 
+            adapter=TimeCounter(self.timeout_duration), 
+            background=self.backgrounds['timeout']
+        )
         outcome_scenes = {
-            'correct': reward_scene,
-            'incorrect': reward_scene,
+            'correct': reward_scene_correct,
+            'incorrect': reward_scene_incorrect,
             'timeout': timeout_scene
         }
         outcome_scene = outcome_scenes[res.outcome]

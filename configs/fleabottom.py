@@ -56,19 +56,19 @@ config['conditions'] = {**forced_choice_trials, **two_afc_trials}
 # design the block structure
 ## first we will have blocks of forced choice trials in 10 block trials at a given magnitude level
 blocks = {}
-magnitudes_custom_order = [3, 1, 5, 2, 4]
-for i, mag in enumerate(magnitudes_custom_order):
-    blocks[i] = dict(
-        conditions=[f'f{mag}left', f'f{mag}right'],
-        length=5,
-        retry={'timeout': True},
-    )
-# then one block mixing all forced choice trials
-blocks[len(blocks)] = dict(
-    conditions=[f'f{mag}left' for mag in magnitudes] + [f'f{mag}right' for mag in magnitudes],
-    length=50,
-    retry={'timeout': True},
-)
+# magnitudes_custom_order = [3, 1, 5, 2, 4]
+# for i, mag in enumerate(magnitudes_custom_order):
+#     blocks[i] = dict(
+#         conditions=[f'f{mag}left', f'f{mag}right'],
+#         length=5,
+#         retry={'timeout': True},
+#     )
+# # then one block mixing all forced choice trials
+# blocks[len(blocks)] = dict(
+#     conditions=[f'f{mag}left' for mag in magnitudes] + [f'f{mag}right' for mag in magnitudes],
+#     length=50,
+#     retry={'timeout': True},
+# )
 # then we will have blocks of 2AFC trials mixing all magnitude levels, starting with easy trials
 for value_difference in range(4, 0, -1):
     condition_list = []
@@ -77,12 +77,19 @@ for value_difference in range(4, 0, -1):
         if option2 in magnitudes:
             condition_list.append(f'c{option1}v{option2}_opt1left')
             condition_list.append(f'c{option1}v{option2}_opt1right')
-
-    block_id = len(blocks)
-    blocks[block_id] = dict(
+    
+    current_block = f'valuediff{value_difference:d}'
+    next_block = f'valuediff{max(value_difference-1, 1):d}'
+    previous_block = f'valuediff({min(value_difference+1, 4)})'
+    blocks[current_block] = dict(
         conditions=condition_list,
         length=20,
         retry={'timeout': True},
+        transition=[
+            {'condition': {'outcome': 'correct', 'min': 15}, 'next': next_block},
+            {'condition': {'outcome': 'correct', 'min': 12}, 'next': current_block},
+            {'next': previous_block}
+        ]
     )
 
 config['blocks'] = blocks

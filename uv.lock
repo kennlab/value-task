@@ -49,7 +49,7 @@ wheels = [
 [[package]]
 name = "experiment"
 version = "0.4.0"
-source = { git = "https://www.github.com/jselvan/experiment?rev=lab#91aba3cfdb83f9a9cc2350cb8ad77ba5e5a7ec6b" }
+source = { git = "https://www.github.com/jselvan/experiment?rev=lab#e0e2b8bb55af0414d6580c9695e88523be5864b4" }
 dependencies = [
     { name = "flask" },
     { name = "flask-socketio" },
