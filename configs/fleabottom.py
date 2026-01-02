@@ -12,6 +12,7 @@ config: Dict[str, Any] = dict(
 magnitudes = range(1, 6)
 reward_duration = 1  # in seconds
 interpulse_interval = 0.2  # in seconds
+config['reward_channels'] = ('3',)
 config['magnitude_mapping'] = {
     mag: {
         'n_pulses': mag, 
@@ -77,10 +78,10 @@ for value_difference in range(4, 0, -1):
         if option2 in magnitudes:
             condition_list.append(f'c{option1}v{option2}_opt1left')
             condition_list.append(f'c{option1}v{option2}_opt1right')
-    
+
     current_block = f'valuediff{value_difference:d}'
     next_block = f'valuediff{max(value_difference-1, 1):d}'
-    previous_block = f'valuediff({min(value_difference+1, 4)})'
+    previous_block = f'valuediff{min(value_difference+1, 4):d}'
     blocks[current_block] = dict(
         conditions=condition_list,
         length=20,
@@ -104,3 +105,7 @@ config['trial_types'] = {
         'class': 'TwoAFCTrial'
     }
 }
+
+if __name__ == '__main__':
+    import pprint
+    pprint.pprint(config)
