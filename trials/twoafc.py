@@ -113,6 +113,7 @@ class TwoAFCTrial(Trial):
         tc = TouchAdapter(
             time_counter=self.duration,
             items=targets,
+            allow_outside_touch=True
         )
         scene = Scene(mgr, adapter=tc)
 

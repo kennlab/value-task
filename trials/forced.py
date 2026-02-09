@@ -28,7 +28,8 @@ class ForcedChoiceTrial(Trial):
         size: Tuple[int, int]=(200, 200), 
         bbox: Optional[T_BBOX_SPEC]=None,
         reward_channels: Tuple[int, ...]=(1, 2),
-        center=CENTER
+        center=CENTER,
+        allow_outside_touch=True
     ):
         super().__init__()
         self.stimulus = stimulus
@@ -45,6 +46,7 @@ class ForcedChoiceTrial(Trial):
         self.error_duration = 2.0
         self.timeout_duration = 2.0
         self.center = center
+        self.allow_outside_touch = allow_outside_touch
     
     @classmethod
     def from_config(cls, config: dict) -> 'ForcedChoiceTrial':
@@ -57,6 +59,8 @@ class ForcedChoiceTrial(Trial):
         bbox = config.get('bbox', None)
         reward_channels = tuple(config.get('reward_channels', (1, 2)))
         center = tuple(config['locations'].get('center', cls.CENTER))
+        
+        allow_outside_touch=config.get("allow_outside_touch", True)
         return cls(
             stimulus=stimulus,
             magnitude=magnitude,
@@ -66,7 +70,8 @@ class ForcedChoiceTrial(Trial):
             size=size,
             bbox=bbox,
             reward_channels=reward_channels,
-            center=center
+            center=center,
+            allow_outside_touch=allow_outside_touch
         )
 
     def get_reward_scene(self, mgr, reward_params) -> Scene:
@@ -97,6 +102,7 @@ class ForcedChoiceTrial(Trial):
         tc = TouchAdapter(
             time_counter=self.duration,
             items={'target': target},
+            allow_outside_touch=self.allow_outside_touch
         )
         scene = Scene(mgr, adapter=tc)
         reward_scene = self.get_reward_scene(mgr, reward_params)

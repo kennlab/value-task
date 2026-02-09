@@ -7,12 +7,55 @@ config: Dict[str, Any] = dict(
     duration=10,
     size=(200,200),
     bbox=dict(width=300, height=300),
+    allow_outside_touch=True,
+    ITI=3,
 )
 
+config['io'] = {
+    'reward': {
+        'type': 'ISMATEC_SERIAL',
+        'address': 'COM5',
+        'channels': [
+            {'channel': '1', 'clockwise': True, 'speed': 100},
+            {'channel': '4', 'clockwise': True, 'speed': 100}
+        ]
+    }
+}
+
+SIZE = 1366, 768
+orientation = 'portrait'
+# orientation = 'landscape'
+if orientation == 'portrait':
+    SIZE = SIZE[1], SIZE[0]
+CENTER = SIZE[0]//2, SIZE[1]//2
+OFFSET = 250
+V_OFFSET = 200
+# LEFT = (CENTER[0] - OFFSET, CENTER[1]-V_OFFSET)
+# RIGHT = (CENTER[0] + OFFSET, CENTER[1]-V_OFFSET)
+LEFT = (CENTER[0]+V_OFFSET, CENTER[1]-OFFSET)
+RIGHT = (CENTER[0]+V_OFFSET, CENTER[1]+OFFSET)
+config['locations'] = {
+    'left': LEFT,
+    'right': RIGHT,
+    'center': CENTER,
+}
+
+config['display'] = {
+  'size': SIZE,
+  'display': 1,
+  'fullscreen': True
+}
+
+config['remote_server'] = {
+    'enabled': True,
+    'show': True,
+    'template_path': 'server',
+}
+
 magnitudes = range(1, 6)
-reward_duration = 1  # in seconds
+reward_duration = 0.5  # in seconds
 interpulse_interval = 0.2  # in seconds
-config['reward_channels'] = ('3',)
+config['reward_channels'] = ('1','4')
 config['magnitude_mapping'] = {
     mag: {
         'n_pulses': mag, 
@@ -21,18 +64,12 @@ config['magnitude_mapping'] = {
     } 
     for mag in magnitudes
 }
-images = [f'stimuli/aada{chr(97+i)}.png' for i in range(5)]
-config['items'] = dict(zip(magnitudes, images))
 
-CENTER = 1080//2, 1920//2
-OFFSET = 250
-LEFT = (CENTER[0] - OFFSET, CENTER[1])
-RIGHT = (CENTER[0] + OFFSET, CENTER[1])
-config['locations'] = {
-    'left': LEFT,
-    'right': RIGHT,
-    'center': CENTER,
-}
+# stimulus set 1
+images = [f'stimuli/aada{chr(97+i)}.png' for i in range(5)]
+# stimulus set 2
+images = [f'stimuli/aada{chr(97+5+i)}.png' for i in range(5)]
+config['items'] = dict(zip(magnitudes, images))
 
 forced_choice_trials = {
     f'f{mag}{loc}': dict(
@@ -61,14 +98,20 @@ blocks = {}
 # for i, mag in enumerate(magnitudes_custom_order):
 #     blocks[i] = dict(
 #         conditions=[f'f{mag}left', f'f{mag}right'],
-#         length=5,
+#         length=1,
 #         retry={'timeout': True},
+#         transition=[
+#             {'next': i+1}
+#         ]
 #     )
 # # then one block mixing all forced choice trials
 # blocks[len(blocks)] = dict(
 #     conditions=[f'f{mag}left' for mag in magnitudes] + [f'f{mag}right' for mag in magnitudes],
-#     length=50,
+#     length=10,
 #     retry={'timeout': True},
+#     transition=[
+#         {'next': 'valuediff4'}
+#     ]
 # )
 # then we will have blocks of 2AFC trials mixing all magnitude levels, starting with easy trials
 for value_difference in range(4, 0, -1):
@@ -81,7 +124,11 @@ for value_difference in range(4, 0, -1):
 
     current_block = f'valuediff{value_difference:d}'
     next_block = f'valuediff{max(value_difference-1, 1):d}'
-    previous_block = f'valuediff{min(value_difference+1, 4):d}'
+    # previous_block = f'valuediff{min(value_difference+1, 4):d}'
+    if value_difference == 4:
+        previous_block = 0 if 0 in blocks else 'valuediff4'
+    else:
+        previous_block = f'valuediff{value_difference+1:d}'
     blocks[current_block] = dict(
         conditions=condition_list,
         length=20,
