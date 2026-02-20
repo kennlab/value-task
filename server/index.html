@@ -9,7 +9,10 @@
 </head>
 <body>
   <h1>Experiment Controller</h1>
-  <img src="/screen" width="640">
+  <div style="display: flex; flex-direction: row;">
+    <img src="/screen" width="640">
+    <div id="plot-container" style="flex: 1; padding-left: 20px;"></div>
+  </div>
   <h2>Controls</h2>
   <button onclick="sendCommand({'do': 'reward'})">Good Monkey!</button>
   <button onclick="sendCommand({'do': 'quit'})">Stop Task</button>
@@ -108,7 +111,7 @@
       <td><b>${Object.values(summary).reduce((a,b) => a + b.incorrect, 0)}</b></td>
       <td><b>${Object.values(summary).reduce((a,b) => a + b.timeout, 0)}</b></td>
     </tr>`;
-    // updatePlot(data);
+    updatePlot(data);
   }
 
   function fetchBehaviour() {
@@ -177,5 +180,64 @@
       fetchBehaviour()
   })
   fetchBehaviour()
+
+  function updatePlot(data) {
+    if (!data || Object.keys(data).length === 0) return;
+
+    // --- Prepare data for plotting ---
+    const trials = Object.values(data).filter(trial => trial.outcome !== 'timeout');
+    console.log('Processing trials for plotting:', trials.length);
+    // Compute left_mag, right_mag, opt1left, and other derived fields
+    const processedTrials = trials.map(trial => {
+      const opt1left = trial.condition.includes('opt1left');
+      if (!trial.magnitudes || trial.magnitudes.length < 2) {
+        console.warn(`Trial ${trial.trialid} has invalid magnitudes:`, trial.magnitudes);
+        return null; // Skip this trial
+      }
+      const [option1Mag, option2Mag] = trial.magnitudes;
+      const leftMag = opt1left ? option1Mag : option2Mag;
+      const rightMag = opt1left ? option2Mag : option1Mag;
+      const leftChosen = opt1left === (trial.outcome === 'correct');
+      const valueDiff = leftMag - rightMag;
+      console.log(`Trial ${trial.trialid}: leftMag=${leftMag}, rightMag=${rightMag}, leftChosen=${leftChosen}, valueDiff=${valueDiff}`);
+
+      return { leftMag, rightMag, leftChosen, valueDiff };
+    });
+
+    // Group by value difference
+    const grouped = {};
+    processedTrials.forEach(trial => {
+      const { valueDiff, leftChosen } = trial;
+      if (!grouped[valueDiff]) grouped[valueDiff] = { leftChosen: 0, total: 0 };
+      grouped[valueDiff].leftChosen += leftChosen ? 1 : 0;
+      grouped[valueDiff].total += 1;
+    });
+
+    const x = Object.keys(grouped).map(Number).sort((a, b) => a - b);
+    const y = x.map(diff => grouped[diff].leftChosen / grouped[diff].total);
+
+    // --- Create the plot ---
+    const plotData = [{
+      x: x,
+      y: y,
+      mode: 'lines+markers',
+      name: 'Left Choice Proportion'
+    }];
+
+    const layout = {
+      title: 'Left Choice by Value Difference',
+      xaxis: { title: 'Value Difference (Left - Right)' },
+      yaxis: { title: 'Proportion', range: [0, 1] },
+      shapes: [
+        { type: 'line', x0: 0, x1: 0, y0: 0, y1: 1, line: { color: 'gray', dash: 'dash' } },
+        { type: 'line', x0: Math.min(...x), x1: Math.max(...x), y0: 0.5, y1: 0.5, line: { color: 'gray', dash: 'dash' } }
+      ],
+      autosize: false,
+      width: 600,
+      height: 600
+    };
+
+    Plotly.newPlot('plot-container', plotData, layout);
+  }
 </script>
 </html>

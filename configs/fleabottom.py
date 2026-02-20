@@ -8,7 +8,7 @@ config: Dict[str, Any] = dict(
     size=(200,200),
     bbox=dict(width=300, height=300),
     allow_outside_touch=True,
-    ITI=3,
+    ITI=1.5,
 )
 
 config['io'] = {
@@ -28,10 +28,12 @@ orientation = 'portrait'
 if orientation == 'portrait':
     SIZE = SIZE[1], SIZE[0]
 CENTER = SIZE[0]//2, SIZE[1]//2
-OFFSET = 250
-V_OFFSET = 200
+# OFFSET = 250
+# V_OFFSET = -200
 # LEFT = (CENTER[0] - OFFSET, CENTER[1]-V_OFFSET)
 # RIGHT = (CENTER[0] + OFFSET, CENTER[1]-V_OFFSET)
+OFFSET = 300
+V_OFFSET = 200
 LEFT = (CENTER[0]+V_OFFSET, CENTER[1]-OFFSET)
 RIGHT = (CENTER[0]+V_OFFSET, CENTER[1]+OFFSET)
 config['locations'] = {
@@ -42,8 +44,10 @@ config['locations'] = {
 
 config['display'] = {
   'size': SIZE,
-  'display': 1,
-  'fullscreen': True
+#   'display': 1,
+#   'fullscreen': True
+   'display': 0,
+   'fullscreen': False
 }
 
 config['remote_server'] = {
