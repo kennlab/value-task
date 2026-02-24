@@ -119,6 +119,9 @@ class TwoAFCTrial(Trial):
 
         if data['magnitudes'][0] > data['magnitudes'][1]:
             correct_choice = 'option1'
+        else:
+            correct_choice = 'option2'
+
         scene.run()
         if scene.quit:
             return TrialResult(

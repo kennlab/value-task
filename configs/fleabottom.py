@@ -9,6 +9,7 @@ config: Dict[str, Any] = dict(
     bbox=dict(width=300, height=300),
     allow_outside_touch=True,
     ITI=1.5,
+    cue_incorrect=False
 )
 
 config['io'] = {
@@ -28,14 +29,20 @@ orientation = 'portrait'
 if orientation == 'portrait':
     SIZE = SIZE[1], SIZE[0]
 CENTER = SIZE[0]//2, SIZE[1]//2
-# OFFSET = 250
-# V_OFFSET = -200
-# LEFT = (CENTER[0] - OFFSET, CENTER[1]-V_OFFSET)
-# RIGHT = (CENTER[0] + OFFSET, CENTER[1]-V_OFFSET)
-OFFSET = 300
-V_OFFSET = 200
-LEFT = (CENTER[0]+V_OFFSET, CENTER[1]-OFFSET)
-RIGHT = (CENTER[0]+V_OFFSET, CENTER[1]+OFFSET)
+
+X_OFFSET = 250
+Y_OFFSET = 200
+# DIAGONAL
+LEFT = (CENTER[0]-X_OFFSET, CENTER[1]-Y_OFFSET)
+RIGHT = (CENTER[0]+X_OFFSET, CENTER[1]+Y_OFFSET)
+# LR
+# LEFT = (CENTER[0]-X_OFFSET, CENTER[1])
+# RIGHT = (CENTER[0]+X_OFFSET, CENTER[1])
+# UD
+# LEFT = (CENTER[0], CENTER[1]-Y_OFFSET)
+# RIGHT = (CENTER[0], CENTER[1]+Y_OFFSET)
+
+
 config['locations'] = {
     'left': LEFT,
     'right': RIGHT,
@@ -44,10 +51,8 @@ config['locations'] = {
 
 config['display'] = {
   'size': SIZE,
-#   'display': 1,
-#   'fullscreen': True
-   'display': 0,
-   'fullscreen': False
+  'display': 1,
+  'fullscreen': True
 }
 
 config['remote_server'] = {
@@ -57,7 +62,7 @@ config['remote_server'] = {
 }
 
 magnitudes = range(1, 6)
-reward_duration = 0.5  # in seconds
+reward_duration = 0.4  # in seconds
 interpulse_interval = 0.2  # in seconds
 config['reward_channels'] = ('1','4')
 config['magnitude_mapping'] = {
@@ -96,28 +101,8 @@ two_afc_trials = {
 config['conditions'] = {**forced_choice_trials, **two_afc_trials}
 
 # design the block structure
-## first we will have blocks of forced choice trials in 10 block trials at a given magnitude level
 blocks = {}
-# magnitudes_custom_order = [3, 1, 5, 2, 4]
-# for i, mag in enumerate(magnitudes_custom_order):
-#     blocks[i] = dict(
-#         conditions=[f'f{mag}left', f'f{mag}right'],
-#         length=1,
-#         retry={'timeout': True},
-#         transition=[
-#             {'next': i+1}
-#         ]
-#     )
-# # then one block mixing all forced choice trials
-# blocks[len(blocks)] = dict(
-#     conditions=[f'f{mag}left' for mag in magnitudes] + [f'f{mag}right' for mag in magnitudes],
-#     length=10,
-#     retry={'timeout': True},
-#     transition=[
-#         {'next': 'valuediff4'}
-#     ]
-# )
-# then we will have blocks of 2AFC trials mixing all magnitude levels, starting with easy trials
+# we will have blocks of 2AFC trials mixing all magnitude levels, starting with easy trials
 for value_difference in range(4, 0, -1):
     condition_list = []
     for option1 in magnitudes:
