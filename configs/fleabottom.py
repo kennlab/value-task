@@ -28,13 +28,13 @@ orientation = 'portrait'
 # orientation = 'landscape'
 if orientation == 'portrait':
     SIZE = SIZE[1], SIZE[0]
-CENTER = SIZE[0]//2, SIZE[1]//2
 
-X_OFFSET = 250
+CENTER = SIZE[0]//2, SIZE[1]//2-100
+X_OFFSET = 200
 Y_OFFSET = 200
 # DIAGONAL
-LEFT = (CENTER[0]-X_OFFSET, CENTER[1]-Y_OFFSET)
-RIGHT = (CENTER[0]+X_OFFSET, CENTER[1]+Y_OFFSET)
+LEFT = (CENTER[0]-X_OFFSET, CENTER[1]+Y_OFFSET)
+RIGHT = (CENTER[0]+X_OFFSET, CENTER[1]-Y_OFFSET)
 # LR
 # LEFT = (CENTER[0]-X_OFFSET, CENTER[1])
 # RIGHT = (CENTER[0]+X_OFFSET, CENTER[1])
@@ -120,11 +120,11 @@ for value_difference in range(4, 0, -1):
         previous_block = f'valuediff{value_difference+1:d}'
     blocks[current_block] = dict(
         conditions=condition_list,
-        length=20,
+        length=10,
         retry={'timeout': True},
         transition=[
-            {'condition': {'outcome': 'correct', 'min': 15}, 'next': next_block},
-            {'condition': {'outcome': 'correct', 'min': 12}, 'next': current_block},
+            {'condition': {'outcome': 'correct', 'min': 8}, 'next': next_block},
+            {'condition': {'outcome': 'correct', 'min': 6}, 'next': current_block},
             {'next': previous_block}
         ]
     )
