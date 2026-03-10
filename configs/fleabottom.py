@@ -9,7 +9,8 @@ config: Dict[str, Any] = dict(
     bbox=dict(width=300, height=300),
     allow_outside_touch=True,
     ITI=1.5,
-    cue_incorrect=False
+    cue_incorrect=True,
+    reward_feedback_method='bar_height'
 )
 
 config['io'] = {
@@ -55,6 +56,14 @@ config['display'] = {
   'fullscreen': True
 }
 
+config['debug'] = {
+    'display': {
+    'size': SIZE,
+    'display': 0,
+    'fullscreen': False
+    }
+}
+
 config['remote_server'] = {
     'enabled': True,
     'show': True,
@@ -65,19 +74,26 @@ magnitudes = range(1, 6)
 reward_duration = 0.4  # in seconds
 interpulse_interval = 0.2  # in seconds
 config['reward_channels'] = ('1','4')
+## reward method - pulses
+# config['magnitude_mapping'] = {
+#     mag: {
+#         'n_pulses': mag, 
+#         'duration': reward_duration, 
+#         'interpulse_interval': interpulse_interval
+#     } 
+#     for mag in magnitudes
+# }
+## reward method - continuous
 config['magnitude_mapping'] = {
-    mag: {
-        'n_pulses': mag, 
-        'duration': reward_duration, 
-        'interpulse_interval': interpulse_interval
-    } 
+    mag: {'duration': reward_duration*mag, 'n_pulses': 1, 'interpulse_interval': 0}
     for mag in magnitudes
 }
-
-# stimulus set 1
-images = [f'stimuli/aada{chr(97+i)}.png' for i in range(5)]
-# stimulus set 2
-images = [f'stimuli/aada{chr(97+5+i)}.png' for i in range(5)]
+# # stimulus set 1
+# images = [f'stimuli/aada{chr(97+i)}.png' for i in range(5)]
+# # stimulus set 2
+# images = [f'stimuli/aada{chr(97+5+i)}.png' for i in range(5)]
+# stimulus set 3
+images = [f'stimuli/aada{chr(97+10+i)}.png' for i in range(5)]
 config['items'] = dict(zip(magnitudes, images))
 
 forced_choice_trials = {

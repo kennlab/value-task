@@ -1,5 +1,5 @@
 from experiment.trial import Trial, TrialResult
-from experiment.experiments.adapters import ImageAdapter, TouchAdapter, RewardAdapter, TimeCounter
+from experiment.experiments.adapters import ImageAdapter, TouchAdapter, RewardAdapter, TimeCounter, RectAdapter
 from experiment.experiments.scene import Scene
 from experiment.util.bbox import T_BBOX_SPEC
 from typing import Optional, Tuple
@@ -29,7 +29,8 @@ class TwoAFCTrial(Trial):
         bbox: Optional[T_BBOX_SPEC]=None,
         reward_channels: Tuple[int, ...]=(1, 2),
         center=CENTER,
-        cue_incorrect: bool = False
+        cue_incorrect: bool = False,
+        reward_feedback_method: str = 'bar_height'
     ):
         super().__init__()
         self.options = options
@@ -47,6 +48,7 @@ class TwoAFCTrial(Trial):
         self.timeout_duration = 2.0
         self.center = center
         self.cue_incorrect = cue_incorrect
+        self.reward_feedback_method = reward_feedback_method
     
     @classmethod
     def from_config(cls, config: dict) -> 'TwoAFCTrial':
@@ -60,6 +62,7 @@ class TwoAFCTrial(Trial):
         reward_channels = tuple(config.get('reward_channels', (1, 2)))
         center = tuple(config['locations'].get('center', cls.CENTER))
         cue_incorrect = config.get('cue_incorrect', False)
+        reward_feedback_method = config.get('reward_feedback_method', 'bar_height')
         return cls(
             options=options,
             magnitudes=magnitudes,
@@ -73,17 +76,28 @@ class TwoAFCTrial(Trial):
             cue_incorrect=cue_incorrect
         )
 
-    def get_reward_scene(self, mgr, reward_params, background) -> Scene:
-        rew = RewardAdapter.from_manager(
-            manager=mgr, 
-            channels=self.reward_channels,
-            progress_params=dict(
+    def get_reward_scene(self, mgr, reward_params, magnitude_level, background) -> Scene:
+        kwargs = {}
+        if self.reward_feedback_method == 'bar_height':
+            kwargs['children'] = [
+                RectAdapter(
+                    position=self.center,
+                    size=[80, 75*magnitude_level],
+                    colour='#000000',
+                )
+            ]
+        elif self.reward_feedback_method == 'progress':
+            kwargs['progress_params']=dict(
                 position=self.center,
                 size=(400, 50),
                 colour=(0, 0, 0),
                 gap=10
-            ),
-            **reward_params
+            )
+        rew = RewardAdapter.from_manager(
+            manager=mgr, 
+            channels=self.reward_channels,
+            **reward_params,
+            **kwargs
         )
         reward_scene = Scene(mgr, rew, background=background)
         return reward_scene
@@ -148,14 +162,17 @@ class TwoAFCTrial(Trial):
             )
 
         chosen_reward = reward_params[0] if tc.chosen == 'option1' else reward_params[1]
+        chosen_mag_level = self.magnitudes[0] if tc.chosen == 'option1' else self.magnitudes[1]
         reward_scene_correct = self.get_reward_scene(
             mgr, 
             chosen_reward, 
+            chosen_mag_level,
             background=self.backgrounds['correct']
         )
         reward_scene_incorrect = self.get_reward_scene(
             mgr, 
             chosen_reward, 
+            chosen_mag_level,
             background=self.backgrounds['incorrect'] if self.cue_incorrect else self.backgrounds['correct']
         )
         timeout_scene = Scene(
@@ -172,6 +189,7 @@ class TwoAFCTrial(Trial):
         outcome_scene.run()
         if outcome_scene.quit:
             res.continue_session = False
-            
+        
+        print(data)
         mgr.record(**data, outcome=res.outcome)
         return res
