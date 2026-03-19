@@ -71,7 +71,7 @@ config['remote_server'] = {
 }
 
 magnitudes = range(1, 6)
-reward_duration = 0.4  # in seconds
+reward_duration = 0.6  # in seconds
 interpulse_interval = 0.2  # in seconds
 config['reward_channels'] = ('1','4')
 ## reward method - pulses
@@ -85,7 +85,7 @@ config['reward_channels'] = ('1','4')
 # }
 ## reward method - continuous
 config['magnitude_mapping'] = {
-    mag: {'duration': reward_duration*mag, 'n_pulses': 1, 'interpulse_interval': 0}
+    mag: {'duration': reward_duration*mag, 'n_pulses': 1, 'interpulse_interval': interpulse_interval}
     for mag in magnitudes
 }
 # # stimulus set 1

@@ -1,0 +1,139 @@
+from experiment.trial import Trial, TrialResult
+from experiment.experiments.adapters import ImageAdapter, TouchAdapter, RewardAdapter, TimeCounter, RectAdapter
+from experiment.experiments.scene import Scene
+from experiment.util.bbox import T_BBOX_SPEC
+from typing import Optional, Tuple, List
+
+INTERPULSE_INTERVAL = 0.2
+class CalibrationTrial(Trial):
+    DEFAULT_MAGNITUDE_MAPPING = {
+        1: {'duration': 1},
+        2: {'duration': 1.5},
+        3: {'duration': 2},
+        4: {'duration': 2.5},
+        5: {'duration': 3},
+    }
+    backgrounds = {
+        'correct': (0, 255, 0),
+        'timeout': (0, 0, 255),
+    }
+    CENTER = (640, 360)
+    def __init__(self, 
+        options: List[str],
+        magnitudes: List[int],
+        locs: List[Tuple[int,int]],
+        magnitude_mapping=None, 
+        duration: float=5.0,
+        size: Tuple[int, int]=(200, 200), 
+        bbox: Optional[T_BBOX_SPEC]=None,
+        reward_channels: Tuple[int, ...]=(1, 2),
+        center=CENTER
+    ):
+        super().__init__()
+        self.options = options
+        self.magnitudes = magnitudes
+        self.locs = locs
+        self.magnitude_mapping = magnitude_mapping or self.DEFAULT_MAGNITUDE_MAPPING
+        self.size = size
+        self.duration = duration
+        if bbox is None:
+            self.bbox: T_BBOX_SPEC = {'width': size[0]*1.5, 'height': size[1]*1.5}
+        else:
+            self.bbox = bbox
+        self.reward_channels = reward_channels
+        self.error_duration = 2.0
+        self.timeout_duration = 2.0
+        self.center = center
+    
+    @classmethod
+    def from_config(cls, config: dict) -> 'CalibrationTrial':
+        magnitudes = config['magnitudes']
+        options = tuple( config['items'][ mag ] for mag in magnitudes )
+        locs = tuple(config['locations'].get(loc, loc) for loc in config['locs'])
+        magnitude_mapping = config.get('magnitude_mapping', cls.DEFAULT_MAGNITUDE_MAPPING)
+        duration = config.get('duration', 5.0)
+        size = tuple(config.get('size', (200, 200)))
+        bbox = config.get('bbox', None)
+        reward_channels = tuple(config.get('reward_channels', (1, 2)))
+        center = tuple(config['locations'].get('center', cls.CENTER))
+        return cls(
+            options=options,
+            magnitudes=magnitudes,
+            locs=locs,
+            magnitude_mapping=magnitude_mapping,
+            duration=duration,
+            size=size,
+            bbox=bbox,
+            reward_channels=reward_channels,
+            center=center,
+        )
+    
+    def get_reward_scene(self, mgr, reward_params, background):
+        progress_params = dict(
+            position=self.center,
+            size=(400, 50),
+            colour=(0, 0, 0),
+            gap=10
+        )
+        rew = RewardAdapter(**reward_params, progress_params=progress_params)
+        scene = Scene(mgr, rew, background=background)
+        return scene
+
+    def run(self, mgr) -> TrialResult:
+        reward_params = [self.magnitude_mapping[mag] for mag in self.magnitudes]
+        targets = {
+            i: ImageAdapter(
+                image=image,
+                position=loc,
+                size=self.size,
+                bbox=self.bbox
+            )
+            for i, (image, loc) in enumerate(zip(self.options, self.locs))
+        }
+        tc = TouchAdapter(
+            time_counter=self.duration,
+            items=targets,
+            allow_outside_touch=True
+        )
+        scene = Scene(mgr, adapter=tc)
+
+        data = {}
+        scene.run()
+        if scene.quit:
+            return TrialResult(
+                continue_session=False, 
+                outcome="quit",
+                data=data
+            )
+        elif tc.chosen in targets:
+            data['chosen'] = chosen = tc.chosen
+            res = TrialResult(
+                continue_session=True, 
+                outcome="correct",
+                data=data
+            )
+        else:
+            chosen=None
+            res = TrialResult(
+                continue_session=True, 
+                outcome="timeout", 
+                data=data
+            )
+
+        if chosen is not None:
+            outcome_scene = self.get_reward_scene(
+                mgr, 
+                reward_params[chosen], 
+                background=self.backgrounds['correct']
+            )
+        else:
+            outcome_scene = Scene(
+                mgr, 
+                adapter=TimeCounter(self.timeout_duration), 
+                background=self.backgrounds['timeout']
+            )
+        outcome_scene.run()
+        if outcome_scene.quit:
+            res.continue_session = False
+        mgr.record(**data, outcome=res.outcome)
+        return res
