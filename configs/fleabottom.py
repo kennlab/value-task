@@ -71,9 +71,11 @@ config['remote_server'] = {
 }
 
 magnitudes = range(1, 6)
-reward_duration = 0.6  # in seconds
+reward_duration = 0.5  # in seconds
 interpulse_interval = 0.2  # in seconds
-config['reward_channels'] = ('1','4')
+# config['reward_channels'] = ('1',)
+config['reward_channels'] = ('1', '4')
+
 ## reward method - pulses
 # config['magnitude_mapping'] = {
 #     mag: {

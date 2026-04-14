@@ -86,6 +86,7 @@ class TwoAFCTrial(Trial):
                     colour='#000000',
                 )
             ]
+            kwargs['progress_params'] = 'none'
         elif self.reward_feedback_method == 'progress':
             kwargs['progress_params']=dict(
                 position=self.center,
