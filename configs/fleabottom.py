@@ -95,7 +95,9 @@ config['magnitude_mapping'] = {
 # # stimulus set 2
 # images = [f'stimuli/aada{chr(97+5+i)}.png' for i in range(5)]
 # stimulus set 3
-images = [f'stimuli/aada{chr(97+10+i)}.png' for i in range(5)]
+# images = [f'stimuli/aada{chr(97+10+i)}.png' for i in range(5)]
+# stimulus set 4
+images = [f'stimuli/aada{chr(97+15+i)}.png' for i in range(5)]
 config['items'] = dict(zip(magnitudes, images))
 
 forced_choice_trials = {
@@ -144,7 +146,8 @@ for value_difference in range(4, 0, -1):
             {'condition': {'outcome': 'correct', 'min': 8}, 'next': next_block},
             {'condition': {'outcome': 'correct', 'min': 6}, 'next': current_block},
             {'next': previous_block}
-        ]
+        ],
+        method='random',
     )
 
 config['blocks'] = blocks
