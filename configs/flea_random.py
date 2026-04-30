@@ -31,25 +31,24 @@ orientation = 'portrait'
 if orientation == 'portrait':
     SIZE = SIZE[1], SIZE[0]
 
-CENTER = SIZE[0]//2, SIZE[1]//2-100
+CENTER = SIZE[0]//2, SIZE[1]//2
 X_OFFSET = 200
 Y_OFFSET = 200
 # DIAGONAL
 LEFT = (CENTER[0]-X_OFFSET, CENTER[1]+Y_OFFSET)
 RIGHT = (CENTER[0]+X_OFFSET, CENTER[1]-Y_OFFSET)
-# LR
-# LEFT = (CENTER[0]-X_OFFSET, CENTER[1])
-# RIGHT = (CENTER[0]+X_OFFSET, CENTER[1])
-# UD
-# LEFT = (CENTER[0], CENTER[1]-Y_OFFSET)
-# RIGHT = (CENTER[0], CENTER[1]+Y_OFFSET)
 
+RADIUS = 400
+N_POSITIONS = 6
+START_ANGLE = 0
+angle_offsets = START_ANGLE + (2*np.pi / N_POSITIONS) * np.arange(N_POSITIONS)
+X, Y = RADIUS*np.cos(angle_offsets), RADIUS*np.sin(angle_offsets)
 
 config['locations'] = {
-    'left': LEFT,
-    'right': RIGHT,
     'center': CENTER,
 }
+for i, (x, y) in enumerate(zip(X, Y)):
+    config[i] = (x, y)
 
 config['display'] = {
   'size': SIZE,
@@ -72,23 +71,11 @@ config['remote_server'] = {
 }
 
 magnitudes = range(1, 6)
-reward_duration = 0.5  # in seconds
+reward_duration = 0.4  # in seconds
 interpulse_interval = 0.2  # in seconds
-# config['reward_channels'] = ('1',)
-config['reward_channels'] = ('1', '4')
-
-## reward method - pulses
-# config['magnitude_mapping'] = {
-#     mag: {
-#         'n_pulses': mag, 
-#         'duration': reward_duration, 
-#         'interpulse_interval': interpulse_interval
-#     } 
-#     for mag in magnitudes
-# }
-## reward method - continuous
+config['reward_channels'] = ('1','4')
 config['magnitude_mapping'] = {
-    mag: {'duration': reward_duration*mag, 'n_pulses': 1, 'interpulse_interval': interpulse_interval}
+    mag: {'duration': reward_duration*mag, 'n_pulses': 1, 'interpulse_interval': 0}
     for mag in magnitudes
 }
 # # stimulus set 1
@@ -96,9 +83,7 @@ config['magnitude_mapping'] = {
 # # stimulus set 2
 # images = [f'stimuli/aada{chr(97+5+i)}.png' for i in range(5)]
 # stimulus set 3
-# images = [f'stimuli/aada{chr(97+10+i)}.png' for i in range(5)]
-# stimulus set 4
-images = [f'stimuli/aada{chr(97+15+i)}.png' for i in range(5)]
+images = [f'stimuli/aada{chr(97+10+i)}.png' for i in range(5)]
 config['items'] = dict(zip(magnitudes, images))
 
 forced_choice_trials = {
@@ -109,14 +94,17 @@ forced_choice_trials = {
     )
     for mag, loc in product(magnitudes, ['left', 'right'])
 }
+
+locations = range(N_POSITIONS)
+location_pairs = [(i, (i+(N_POSITIONS//2))%N_POSITIONS) for i in locations]
+
 two_afc_trials = {
-    f'c{option1}v{option2}_opt1{locs[0]}': dict(
+    i: dict(
         magnitudes=(option1, option2),
         locs=locs,
         trial_type='choice'
     )
-    for (option1, option2), locs in product(product(magnitudes, repeat=2), [('left', 'right'), ('right', 'left')])
-    if option1 != option2
+    for i, ((option1, option2), locs) in enumerate(product(combinations(magnitudes, 2), location_pairs))
 }
 
 config['conditions'] = {**forced_choice_trials, **two_afc_trials}
@@ -126,11 +114,10 @@ blocks = {}
 # we will have blocks of 2AFC trials mixing all magnitude levels, starting with easy trials
 for value_difference in range(4, 0, -1):
     condition_list = []
-    for option1 in magnitudes:
-        option2 = option1 - value_difference
-        if option2 in magnitudes:
-            condition_list.append(f'c{option1}v{option2}_opt1left')
-            condition_list.append(f'c{option1}v{option2}_opt1right')
+    for condition, info in two_afc_trials.items():
+        op1, op2 = info.get('magnitudes')
+        if abs(op1-op2)==value_difference:
+            condition_list.append(condition)
 
     current_block = f'valuediff{value_difference:d}'
     next_block = f'valuediff{max(value_difference-1, 1):d}'
@@ -148,7 +135,7 @@ for value_difference in range(4, 0, -1):
             {'condition': {'outcome': 'correct', 'min': 6}, 'next': current_block},
             {'next': previous_block}
         ],
-        method='random',
+        method='random'
     )
 
 config['blocks'] = blocks
