@@ -1,6 +1,6 @@
 import numpy as np
 from typing import Dict, Any
-from itertools import product
+from itertools import product, combinations
 
 
 config: Dict[str, Any] = dict(
@@ -34,34 +34,22 @@ if orientation == 'portrait':
 CENTER = SIZE[0]//2, SIZE[1]//2
 X_OFFSET = 200
 Y_OFFSET = 200
-# DIAGONAL
-LEFT = (CENTER[0]-X_OFFSET, CENTER[1]+Y_OFFSET)
-RIGHT = (CENTER[0]+X_OFFSET, CENTER[1]-Y_OFFSET)
-
 RADIUS = 400
 N_POSITIONS = 6
 START_ANGLE = 0
 angle_offsets = START_ANGLE + (2*np.pi / N_POSITIONS) * np.arange(N_POSITIONS)
-X, Y = RADIUS*np.cos(angle_offsets), RADIUS*np.sin(angle_offsets)
+X, Y = CENTER[0]+RADIUS*np.cos(angle_offsets), CENTER[1]+RADIUS*np.sin(angle_offsets)
 
 config['locations'] = {
     'center': CENTER,
 }
 for i, (x, y) in enumerate(zip(X, Y)):
-    config[i] = (x, y)
+    config['locations'][i] = (x, y)
 
 config['display'] = {
-  'size': SIZE,
-  'display': 0,
-  'fullscreen': True
-}
-
-config['debug'] = {
-    'display': {
     'size': SIZE,
     'display': 0,
-    'fullscreen': False
-    }
+    'fullscreen': True
 }
 
 config['remote_server'] = {
