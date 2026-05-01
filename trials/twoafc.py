@@ -144,6 +144,7 @@ class TwoAFCTrial(Trial):
             correct_choice = 'option2'
 
         scene.run()
+        data['RT'] = tc.RT
         if scene.quit:
             return TrialResult(
                 continue_session=False, 

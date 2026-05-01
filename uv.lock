@@ -142,8 +142,8 @@ wheels = [
 
 [[package]]
 name = "experiment"
-version = "0.5.0"
-source = { editable = "../experiment" }
+version = "0.6.0"
+source = { git = "https://github.com/jselvan/experiment#7d3a87867fe5581ecc32685c35081e94d9573901" }
 dependencies = [
     { name = "flask" },
     { name = "flask-socketio" },
@@ -154,26 +154,6 @@ dependencies = [
     { name = "pyserial" },
     { name = "pyyaml" },
     { name = "tqdm" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "flask", specifier = ">=3.1.2" },
-    { name = "flask-socketio", specifier = ">=5.5.1" },
-    { name = "numpy", specifier = ">=2.3.4" },
-    { name = "opencv-python", specifier = ">=4.11.0.86" },
-    { name = "pillow", specifier = ">=12.0.0" },
-    { name = "pygame", specifier = ">=2.6.1" },
-    { name = "pyserial", specifier = ">=3.5" },
-    { name = "pyyaml", specifier = ">=6.0.3" },
-    { name = "tqdm", specifier = ">=4.67.1" },
-]
-
-[package.metadata.requires-dev]
-dev = [
-    { name = "ipython", specifier = ">=9.6.0" },
-    { name = "pytest", specifier = ">=8.0" },
-    { name = "pytest-cov", specifier = ">=5.0" },
 ]
 
 [[package]]
@@ -949,7 +929,7 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
-    { name = "experiment", editable = "../experiment" },
+    { name = "experiment", git = "https://github.com/jselvan/experiment" },
     { name = "ipython", specifier = ">=9.10.0" },
     { name = "matplotlib", specifier = ">=3.10.8" },
     { name = "pandas", specifier = ">=3.0.0" },

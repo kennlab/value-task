@@ -13,4 +13,4 @@ dependencies = [
 ]
 
 [tool.uv.sources]
-experiment = { path = "../experiment", editable = true }
+experiment = { git = "https://github.com/jselvan/experiment" }
