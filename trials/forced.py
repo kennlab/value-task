@@ -5,6 +5,9 @@ from experiment.util.bbox import T_BBOX_SPEC
 from typing import Optional, Tuple, Dict, Any, Literal
 
 INTERPULSE_INTERVAL = 0.2
+REWARD_PROGRESS_SIZE = (0.4166666667, 0.0925925926)
+REWARD_PROGRESS_GAP = 0.0185185185
+
 class ForcedChoiceTrial(Trial):
     DEFAULT_MAGNITUDE_MAPPING = {
         1: {'duration': 1},
@@ -18,7 +21,7 @@ class ForcedChoiceTrial(Trial):
         'incorrect': (255, 0, 0),
         'timeout': (0, 0, 255),
     }
-    CENTER = (640, 360)
+    CENTER = (0.0, 0.0)
     def __init__(self, 
         stimulus: str, 
         magnitude: int, 
@@ -84,9 +87,9 @@ class ForcedChoiceTrial(Trial):
             channels=self.reward_channels,
             progress_params=dict(
                 position=self.center,
-                size=(400, 50),
+                size=REWARD_PROGRESS_SIZE,
                 colour=(0, 0, 0),
-                gap=10
+                gap=REWARD_PROGRESS_GAP,
             ),
             **reward_params
         )

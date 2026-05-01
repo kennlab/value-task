@@ -5,6 +5,12 @@ from experiment.util.bbox import T_BBOX_SPEC
 from typing import Optional, Tuple
 
 INTERPULSE_INTERVAL = 0.2
+REWARD_BAR_WIDTH = 0.0833333333
+REWARD_BAR_HEIGHT_PER_LEVEL = 0.1388888889
+REWARD_PROGRESS_SIZE = (0.4166666667, 0.0925925926)
+REWARD_PROGRESS_GAP = 0.0185185185
+HIDDEN_PROGRESS_SIZE = (0.001, 0.001)
+
 class TwoAFCTrial(Trial):
     DEFAULT_MAGNITUDE_MAPPING = {
         1: {'duration': 1},
@@ -18,7 +24,7 @@ class TwoAFCTrial(Trial):
         'incorrect': (255, 0, 0),
         'timeout': (0, 0, 255),
     }
-    CENTER = (640, 360)
+    CENTER = (0.0, 0.0)
     def __init__(self, 
         options: Tuple[str, str],
         magnitudes: Tuple[int, int],
@@ -87,17 +93,22 @@ class TwoAFCTrial(Trial):
             kwargs['children'] = [
                 RectAdapter(
                     position=self.center,
-                    size=[80, 75*magnitude_level],
+                    size=(REWARD_BAR_WIDTH, REWARD_BAR_HEIGHT_PER_LEVEL * magnitude_level),
                     colour='#000000',
                 )
             ]
-            kwargs['progress_params'] = 'none'
+            kwargs['progress_params'] = dict(
+                position=self.center,
+                size=HIDDEN_PROGRESS_SIZE,
+                colour=(0, 0, 0),
+                gap=0.0,
+            )
         elif self.reward_feedback_method == 'progress':
             kwargs['progress_params']=dict(
                 position=self.center,
-                size=(400, 50),
+                size=REWARD_PROGRESS_SIZE,
                 colour=(0, 0, 0),
-                gap=10
+                gap=REWARD_PROGRESS_GAP,
             )
         rew = RewardAdapter.from_manager(
             manager=mgr, 
