@@ -142,8 +142,8 @@ wheels = [
 
 [[package]]
 name = "experiment"
-version = "0.4.0"
-source = { git = "https://www.github.com/jselvan/experiment#cca989aee6ac6980faea101f71441699d49b3e32" }
+version = "0.5.0"
+source = { editable = "../experiment" }
 dependencies = [
     { name = "flask" },
     { name = "flask-socketio" },
@@ -151,8 +151,29 @@ dependencies = [
     { name = "opencv-python" },
     { name = "pillow" },
     { name = "pygame" },
+    { name = "pyserial" },
     { name = "pyyaml" },
     { name = "tqdm" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "flask", specifier = ">=3.1.2" },
+    { name = "flask-socketio", specifier = ">=5.5.1" },
+    { name = "numpy", specifier = ">=2.3.4" },
+    { name = "opencv-python", specifier = ">=4.11.0.86" },
+    { name = "pillow", specifier = ">=12.0.0" },
+    { name = "pygame", specifier = ">=2.6.1" },
+    { name = "pyserial", specifier = ">=3.5" },
+    { name = "pyyaml", specifier = ">=6.0.3" },
+    { name = "tqdm", specifier = ">=4.67.1" },
+]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "ipython", specifier = ">=9.6.0" },
+    { name = "pytest", specifier = ">=8.0" },
+    { name = "pytest-cov", specifier = ">=5.0" },
 ]
 
 [[package]]
@@ -611,7 +632,7 @@ name = "pexpect"
 version = "4.9.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "ptyprocess" },
+    { name = "ptyprocess", marker = "sys_platform != 'emscripten' and sys_platform != 'win32'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/42/92/cc564bf6381ff43ce1f4d06852fc19a2f11d180f23dc32d9588bee2f149d/pexpect-4.9.0.tar.gz", hash = "sha256:ee7d41123f3c9911050ea2c2dac107568dc43b2d3b0c7557a33212c398ead30f", size = 166450, upload-time = "2023-11-25T09:07:26.339Z" }
 wheels = [
@@ -928,7 +949,7 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
-    { name = "experiment", git = "https://www.github.com/jselvan/experiment" },
+    { name = "experiment", editable = "../experiment" },
     { name = "ipython", specifier = ">=9.10.0" },
     { name = "matplotlib", specifier = ">=3.10.8" },
     { name = "pandas", specifier = ">=3.0.0" },

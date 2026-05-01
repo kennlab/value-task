@@ -1,245 +1,1234 @@
+{% set control_buttons = [
+  {'label': 'Reward', 'command': {'do': 'reward'}, 'tone': 'primary'},
+  {'label': 'Pause', 'command': {'do': 'pause'}, 'tone': 'neutral'},
+  {'label': 'Resume', 'command': {'do': 'unpause'}, 'tone': 'neutral'},
+  {'label': 'Pump On', 'command': {'do': 'pump_on'}, 'tone': 'neutral'},
+  {'label': 'Pump Off', 'command': {'do': 'pump_off'}, 'tone': 'neutral'},
+  {'label': 'Stop Task', 'command': {'do': 'quit'}, 'tone': 'danger'}
+] %}
+{% set summary_columns = ['Block #', 'Block', 'Trials', 'Correct', 'Incorrect', 'Timeout', 'Accuracy'] %}
+
+{% macro command_button(label, command, tone='neutral') -%}
+  <button class="btn btn-{{ tone }}" type="button" data-command='{{ command|tojson }}'>{{ label }}</button>
+{%- endmacro %}
+
+{% macro stat_tile(label, value_id, hint='') -%}
+  <div class="stat-tile">
+    <span>{{ label }}</span>
+    <strong id="{{ value_id }}">0</strong>
+    {% if hint %}<small>{{ hint }}</small>{% endif %}
+  </div>
+{%- endmacro %}
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Experiment Controller</title>
-    <script src="{{ url_for('static', filename='socketio.min.js') }}"></script>
-    <script src="{{ url_for('static', filename='plotly.min.js') }}"></script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Experiment Controller</title>
+  <script src="{{ url_for('static', filename='socketio.min.js') }}"></script>
+  <script src="{{ url_for('static', filename='plotly.min.js') }}"></script>
+  <style>
+    :root {
+      --bg: #f5f7fb;
+      --panel: #ffffff;
+      --ink: #17202c;
+      --muted: #657083;
+      --line: #d9e0ea;
+      --accent: #087f8c;
+      --accent-dark: #055f69;
+      --warn: #b45309;
+      --danger: #b4233a;
+      --shadow: 0 16px 36px rgba(23, 32, 44, 0.08);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: "Segoe UI", Arial, sans-serif;
+      letter-spacing: 0;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 18px 24px;
+      background: #111827;
+      color: #ffffff;
+    }
+
+    .topbar h1 {
+      margin: 0;
+      font-size: 22px;
+      font-weight: 700;
+    }
+
+    .eyebrow {
+      margin: 0 0 4px;
+      color: #9ccfd6;
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+
+    .status-pill {
+      min-width: 150px;
+      max-width: 380px;
+      padding: 8px 12px;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 999px;
+      color: #dbeafe;
+      font-size: 13px;
+      text-align: right;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .shell {
+      width: min(1560px, calc(100vw - 32px));
+      margin: 18px auto 28px;
+      display: grid;
+      grid-template-columns: minmax(300px, 430px) minmax(0, 1fr);
+      gap: 18px;
+    }
+
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+    }
+
+    .screen-panel {
+      padding: 14px;
+      align-self: start;
+    }
+
+    .screen-frame {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 260px;
+      background: #0b1020;
+      border-radius: 6px;
+      overflow: hidden;
+    }
+
+    .screen-frame img {
+      display: block;
+      width: 100%;
+      max-height: 62vh;
+      object-fit: contain;
+    }
+
+    .control-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+      margin-top: 14px;
+    }
+
+    .reward-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 112px;
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    .field {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      min-width: 0;
+    }
+
+    label,
+    .field-label {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+
+    input,
+    select {
+      width: 100%;
+      min-height: 38px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 8px 10px;
+      color: var(--ink);
+      background: #ffffff;
+      font: inherit;
+    }
+
+    .btn {
+      min-height: 38px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 8px 12px;
+      background: #ffffff;
+      color: var(--ink);
+      font: inherit;
+      font-weight: 700;
+      cursor: pointer;
+      transition: transform 120ms ease, border-color 120ms ease, background 120ms ease;
+    }
+
+    .btn:hover {
+      border-color: #aab7c7;
+      transform: translateY(-1px);
+    }
+
+    .btn-primary {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #ffffff;
+    }
+
+    .btn-primary:hover {
+      background: var(--accent-dark);
+    }
+
+    .btn-danger {
+      background: #fff4f5;
+      border-color: #f2b8c1;
+      color: var(--danger);
+    }
+
+    .analysis-panel {
+      padding: 18px;
+      min-width: 0;
+    }
+
+    .section-header {
+      display: flex;
+      align-items: end;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 14px;
+    }
+
+    .section-header h2 {
+      margin: 0;
+      font-size: 20px;
+    }
+
+    .section-header p {
+      margin: 4px 0 0;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(120px, 1fr));
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+
+    .stat-tile {
+      min-height: 86px;
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fbfcfe;
+    }
+
+    .stat-tile span {
+      display: block;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+
+    .stat-tile strong {
+      display: block;
+      margin-top: 6px;
+      font-size: 28px;
+      line-height: 1;
+    }
+
+    .stat-tile small {
+      display: block;
+      margin-top: 6px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .filter-panel {
+      display: grid;
+      grid-template-columns: minmax(260px, 1.4fr) minmax(180px, 0.9fr) repeat(2, minmax(130px, 0.7fr)) repeat(2, minmax(180px, 1fr)) auto;
+      gap: 10px;
+      align-items: end;
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fbfcfe;
+      margin-bottom: 16px;
+    }
+
+    .segmented {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      overflow: hidden;
+      background: #ffffff;
+    }
+
+    .segmented input {
+      position: absolute;
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .segmented label {
+      min-height: 38px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 7px 8px;
+      border-right: 1px solid var(--line);
+      color: var(--ink);
+      font-size: 13px;
+      text-transform: none;
+      cursor: pointer;
+    }
+
+    .segmented label:last-child {
+      border-right: 0;
+    }
+
+    .segmented input:checked + label {
+      background: #e6f4f6;
+      color: var(--accent-dark);
+    }
+
+    .checkbox-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      min-height: 38px;
+      align-items: center;
+    }
+
+    .checkbox-chip {
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+    }
+
+    .checkbox-chip input {
+      position: absolute;
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .checkbox-chip span {
+      min-height: 32px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 6px 10px;
+      background: #ffffff;
+      color: var(--ink);
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    .checkbox-chip input:checked + span {
+      border-color: #a9d7dc;
+      background: #e6f4f6;
+      color: var(--accent-dark);
+    }
+
+    .plot-layout {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 230px;
+      gap: 14px;
+      min-height: 480px;
+    }
+
+    #plot-container {
+      width: 100%;
+      min-height: 460px;
+    }
+
+    .pair-legend {
+      border-left: 1px solid var(--line);
+      padding-left: 14px;
+      min-width: 0;
+    }
+
+    .pair-legend h3 {
+      margin: 4px 0 12px;
+      font-size: 14px;
+    }
+
+    .legend-list {
+      display: grid;
+      gap: 10px;
+    }
+
+    .legend-item {
+      display: grid;
+      grid-template-columns: 18px 58px minmax(0, 1fr);
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+      color: var(--ink);
+      font-size: 13px;
+    }
+
+    .legend-swatch {
+      width: 18px;
+      height: 4px;
+      border-radius: 999px;
+    }
+
+    .pair-glyph {
+      width: 54px;
+      height: 54px;
+      display: block;
+    }
+
+    .legend-text {
+      min-width: 0;
+    }
+
+    .legend-text strong,
+    .legend-text span {
+      display: block;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .legend-text span {
+      margin-top: 2px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .table-wrap {
+      margin-top: 18px;
+      overflow-x: auto;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 640px;
+      background: #ffffff;
+    }
+
+    th,
+    td {
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--line);
+      text-align: left;
+      font-size: 13px;
+      white-space: nowrap;
+    }
+
+    th {
+      background: #f1f5f9;
+      color: #455163;
+      font-size: 12px;
+      text-transform: uppercase;
+    }
+
+    tr:last-child td {
+      border-bottom: 0;
+    }
+
+    .current-trial {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+      margin-top: 14px;
+      padding-top: 14px;
+      border-top: 1px solid var(--line);
+    }
+
+    .current-trial div {
+      min-width: 0;
+    }
+
+    .current-trial span {
+      display: block;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+
+    .current-trial strong {
+      display: block;
+      margin-top: 4px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-size: 14px;
+    }
+
+    @media (max-width: 1120px) {
+      .shell {
+        grid-template-columns: 1fr;
+      }
+
+      .plot-layout {
+        grid-template-columns: 1fr;
+      }
+
+      .pair-legend {
+        border-left: 0;
+        border-top: 1px solid var(--line);
+        padding-left: 0;
+        padding-top: 12px;
+      }
+
+      .filter-panel {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+    }
+
+    @media (max-width: 720px) {
+      .topbar,
+      .section-header {
+        align-items: stretch;
+        flex-direction: column;
+      }
+
+      .status-pill {
+        text-align: left;
+      }
+
+      .stats-grid,
+      .filter-panel,
+      .control-grid,
+      .reward-row,
+      .current-trial {
+        grid-template-columns: 1fr;
+      }
+
+      .segmented {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+    }
+  </style>
 </head>
 <body>
-  <h1>Experiment Controller</h1>
-  <div style="display: flex; flex-direction: row;">
-    <img src="/screen" width="640">
-    <div style="display: flex; flex-direction: column;">
-      <div id="plot-container" style="flex: 1; padding-left: 20px;"></div>
-      <div id="summary">
-        <h2>Block Summary</h2>
+  <header class="topbar">
+    <div>
+      <p class="eyebrow">Fleabottom</p>
+      <h1>Experiment Controller</h1>
+    </div>
+    <div class="status-pill" id="response">Ready</div>
+  </header>
+
+  <main class="shell">
+    <aside class="panel screen-panel">
+      <div class="screen-frame">
+        <img src="/screen" alt="Subject screen">
+      </div>
+
+      <div class="reward-row">
+        <button class="btn btn-primary" type="button" data-command='{"do":"reward"}'>Reward</button>
+        <div class="field">
+          <label for="reward-duration">Seconds</label>
+          <input type="number" id="reward-duration" min="0.01" step="0.05" value="0.5">
+        </div>
+      </div>
+
+      <div class="control-grid">
+        {% for button in control_buttons[1:] %}
+          {{ command_button(button.label, button.command, button.tone) }}
+        {% endfor %}
+        <button class="btn" type="button" id="download-latest">Download Data</button>
+      </div>
+
+      <div class="current-trial">
+        <div>
+          <span>Trial ID</span>
+          <strong id="trialid">N/A</strong>
+        </div>
+        <div>
+          <span>Condition</span>
+          <strong id="condition">N/A</strong>
+        </div>
+        <div>
+          <span>Block</span>
+          <strong id="block">N/A</strong>
+        </div>
+        <div>
+          <span>Block #</span>
+          <strong id="block_number">N/A</strong>
+        </div>
+      </div>
+    </aside>
+
+    <section class="panel analysis-panel">
+      <div class="section-header">
+        <div>
+          <h2>Choice Performance</h2>
+          <p id="filter-readout">0 records</p>
+        </div>
+      </div>
+
+      <div class="stats-grid">
+        {{ stat_tile('Records', 'stat-records', 'filtered') }}
+        {{ stat_tile('Choice Trials', 'stat-choice', 'non-forced') }}
+        {{ stat_tile('Accuracy', 'stat-accuracy', 'correct / scored') }}
+        {{ stat_tile('Timeouts', 'stat-timeouts', 'choice trials') }}
+      </div>
+
+      <form class="filter-panel" id="filter-form">
+        <div class="field">
+          <span class="field-label">Data Window</span>
+          <div class="segmented" role="group" aria-label="Data window">
+            <input type="radio" name="filter_mode" id="filter-all" value="all" checked>
+            <label for="filter-all">All</label>
+            <input type="radio" name="filter_mode" id="filter-recent" value="recent">
+            <label for="filter-recent">Recent</label>
+            <input type="radio" name="filter_mode" id="filter-trial" value="trial">
+            <label for="filter-trial">Trial Range</label>
+            <input type="radio" name="filter_mode" id="filter-clock" value="clock">
+            <label for="filter-clock">Clock Range</label>
+          </div>
+        </div>
+        <div class="field">
+          <span class="field-label">Stimulus Sets</span>
+          <div class="checkbox-grid" id="stimulus-set-filter"></div>
+        </div>
+        <div class="field">
+          <label for="recent-count">Last N</label>
+          <input type="number" id="recent-count" min="1" step="1" value="50">
+        </div>
+        <div class="field">
+          <label for="trial-start">Trials</label>
+          <input type="text" id="trial-start" placeholder="start:end">
+        </div>
+        <div class="field">
+          <label for="time-start">Start</label>
+          <input type="datetime-local" id="time-start">
+        </div>
+        <div class="field">
+          <label for="time-end">End</label>
+          <input type="datetime-local" id="time-end">
+        </div>
+        <button class="btn" type="button" id="reset-filter">Reset</button>
+      </form>
+
+      <div class="plot-layout">
+        <div id="plot-container"></div>
+        <aside class="pair-legend">
+          <h3>Position Pairs</h3>
+          <div class="legend-list" id="pair-legend"></div>
+        </aside>
+      </div>
+
+      <div class="table-wrap">
         <table id="summary-table">
           <thead>
             <tr>
-              <th>Block Number</th>
-              <th>Block</th>
-              <th>Outcome: Correct</th>
-              <th>Outcome: incorrect</th>
-              <th>Outcome: Timeout</th>
-              <th>Optimal: True</th>
-              <th>Optimal: False</th>
+              {% for column in summary_columns %}
+                <th>{{ column }}</th>
+              {% endfor %}
             </tr>
           </thead>
           <tbody></tbody>
         </table>
       </div>
-    </div>
-  </div>
-  <h2>Controls</h2>
-  <button onclick="sendCommand({'do': 'reward'})">Good Monkey!</button>
-  <button onclick="sendCommand({'do': 'quit'})">Stop Task</button>
-  <button onclick="sendCommand({'do': 'pump_on'})">Pump On</button>
-  <button onclick="sendCommand({'do': 'pump_off'})">Pump Off</button>
-  <button id="download-latest" onclick="downloadLatestBehaviour()">Download Latest Behaviour</button>
+    </section>
+  </main>
 
-  <h2>Update Variables</h2>
-  <form id="vars-form">
-    <label for="default_reward_duration">Reward Duration:</label>
-    <input type="number" id="default_reward_duration" name="default_reward_duration" step="0.1" value="0.5" />
-    <label for="size">Size:</label>
-    <input type="text" id="size" name="size" value="1080, 1920" />
-    <button type="submit">Update Variables</button>
-  </form>
-
-  <div id="info">
-    <h2>Current Trial Info</h2>
-    <p><b>Trial ID:</b> <span id="trialid"></span></p>
-    <p><b>Condition:</b> <span id="condition"></span></p>
-    <p><b>Block:</b> <span id="block"></span></p>
-    <p><b>Block Number:</b> <span id="block_number"></span></p>
-  </div>
-
-
-
-  <p id="response"></p>
-</body>
-<script>
-  var socket = io.connect("http://" + document.domain + ":" + location.port);
-
-  function sendCommand(action) {
-      socket.emit('command', action);
-  }
-  socket.on('response', function(data) {
-      document.getElementById("response").innerText = data.message;
-  });
-
-  function updateDisplay(data) {
-    if (!data || Object.keys(data).length === 0) return;
-    // --- Get the latest trial ---
-    const lastKey = Math.max(...Object.keys(data).map(k => parseInt(k)));
-    const lastTrial = data[lastKey];
-    document.getElementById('trialid').textContent = lastTrial.trialid ?? 'N/A';
-    document.getElementById('condition').textContent = lastTrial.condition ?? 'N/A';
-    document.getElementById('block').textContent = lastTrial.block ?? 'N/A';
-    document.getElementById('block_number').textContent = lastTrial.block_number ?? 'N/A';
-    // --- Aggregate counts per block ---
-    const summary = {};
-    for (const key in data) {
-      const trial = data[key];
-      const b = trial.block_number;
-      if (!summary[b]) {
-        summary[b] = { block: trial.block, correct: 0, incorrect: 0, timeout: 0 };
-      }
-      if (trial.outcome) {
-        if (trial.outcome === 'correct') summary[b].correct++;
-        else if (trial.outcome === 'incorrect') summary[b].incorrect++;
-        else if (trial.outcome === 'timeout') summary[b].timeout++;
-      }
-    }
-    // --- Update table ---
-    const tbody = document.querySelector('#summary-table tbody');
-    tbody.innerHTML = '';
-    for (const b in summary) {
-      const s = summary[b];
-      const row = `<tr>
-        <td>${b}</td>
-        <td>${s.block}</td>
-        <td>${s.correct}</td>
-        <td>${s.incorrect}</td>
-        <td>${s.timeout}</td>
-      </tr>`;
-      tbody.innerHTML += row;
-    }
-    tbody.innerHTML += `<tr>
-      <td colspan="2"><b>Total</b></td>
-      <td><b>${Object.values(summary).reduce((a,b) => a + b.correct, 0)}</b></td>
-      <td><b>${Object.values(summary).reduce((a,b) => a + b.incorrect, 0)}</b></td>
-      <td><b>${Object.values(summary).reduce((a,b) => a + b.timeout, 0)}</b></td>
-    </tr>`;
-    updatePlot(data);
-  }
-
-  function fetchBehaviour() {
-      fetch('/behaviour_summary')
-      .then(response=>response.json())
-      .then(data => {
-          updateDisplay(data)
-      })
-  }
-  
-  function downloadLatestBehaviour() {
-      fetch('/behaviour_summary')
-        .then(response => response.json())
-        .then(data => {
-          if (!data || Object.keys(data).length === 0) {
-            alert('No behaviour data available to download.');
-            return;
-          }
-          const keys = Object.keys(data).map(k => parseInt(k)).filter(n => !isNaN(n));
-          const filename = `behaviour_latest.json`;
-          const jsonStr = JSON.stringify(data, null, 2);
-          const blob = new Blob([jsonStr], { type: 'application/json' });
-          const url = URL.createObjectURL(blob);
-          const a = document.createElement('a');
-          a.href = url;
-          a.download = filename;
-          document.body.appendChild(a);
-          a.click();
-          a.remove();
-          URL.revokeObjectURL(url);
-        })
-        .catch(err => {
-          console.error('Error fetching behaviour for download', err);
-          alert('Error downloading behaviour');
-        });
-  }
-  
-  // --- Variables update form handler ---
-  (function() {
-    const varsForm = document.getElementById('vars-form');
-    if (!varsForm) return;
-    varsForm.addEventListener('submit', function(e) {
-      e.preventDefault();
-      const formData = new FormData(varsForm);
-      const variables = {};
-      for (const [key, value] of formData.entries()) {
-        const trimmed = (value || '').toString().trim();
-        if (trimmed.includes(',')) {
-          // Handle as array
-          const arr = trimmed.split(',').map(item => {
-            const trimmed_item = item.trim();
-            const num = Number(trimmed_item);
-            return (trimmed_item !== '' && !isNaN(num)) ? num : trimmed_item;
-          });
-          variables[key] = arr;
-          continue;
-        }
-        const num = Number(trimmed);
-        variables[key] = (trimmed !== '' && !isNaN(num)) ? num : value;
-      }
-      sendCommand({ do: 'update_variables', variables: variables });
-    });
-  })();
-    
-  socket.on('trial_end', function(data) {
-      fetchBehaviour()
-  })
-  fetchBehaviour()
-
-  function updatePlot(data) {
-    if (!data || Object.keys(data).length === 0) return;
-
-    // --- Prepare data for plotting ---
-    const trials = Object.values(data).filter(trial => trial.outcome !== 'timeout');
-    console.log('Processing trials for plotting:', trials.length);
-    // Compute left_mag, right_mag, opt1left, and other derived fields
-    const processedTrials = trials.map(trial => {
-      const opt1left = trial.condition.includes('opt1left');
-      if (!trial.magnitudes || trial.magnitudes.length < 2) {
-        console.warn(`Trial ${trial.trialid} has invalid magnitudes:`, trial.magnitudes);
-        return null; // Skip this trial
-      }
-      const [option1Mag, option2Mag] = trial.magnitudes;
-      const leftMag = opt1left ? option1Mag : option2Mag;
-      const rightMag = opt1left ? option2Mag : option1Mag;
-      const leftChosen = opt1left === (trial.outcome === 'correct');
-      const valueDiff = leftMag - rightMag;
-      console.log(`Trial ${trial.trialid}: leftMag=${leftMag}, rightMag=${rightMag}, leftChosen=${leftChosen}, valueDiff=${valueDiff}`);
-
-      return { leftMag, rightMag, leftChosen, valueDiff };
-    });
-
-    // Group by value difference
-    const grouped = {};
-    processedTrials.forEach(trial => {
-      const { valueDiff, leftChosen } = trial;
-      if (!grouped[valueDiff]) grouped[valueDiff] = { leftChosen: 0, total: 0 };
-      grouped[valueDiff].leftChosen += leftChosen ? 1 : 0;
-      grouped[valueDiff].total += 1;
-    });
-
-    const x = Object.keys(grouped).map(Number).sort((a, b) => a - b);
-    const y = x.map(diff => grouped[diff].leftChosen / grouped[diff].total);
-
-    // --- Create the plot ---
-    const plotData = [{
-      x: x,
-      y: y,
-      mode: 'lines+markers',
-      name: 'Left Choice Proportion'
-    }];
-
-    const layout = {
-      title: 'Left Choice by Value Difference',
-      xaxis: { title: 'Value Difference (Left - Right)' },
-      yaxis: { title: 'Proportion', range: [0, 1] },
-      shapes: [
-        { type: 'line', x0: 0, x1: 0, y0: 0, y1: 1, line: { color: 'gray', dash: 'dash' } },
-        { type: 'line', x0: Math.min(...x), x1: Math.max(...x), y0: 0.5, y1: 0.5, line: { color: 'gray', dash: 'dash' } }
-      ],
-      autosize: false,
-      width: 600,
-      height: 600
+  <script>
+    const socket = io.connect(window.location.origin);
+    const palette = ['#087f8c', '#b45309', '#5b5fc7', '#1f7a4d', '#c2410c', '#7c3aed', '#be185d'];
+    const state = {
+      rawData: {},
+      trials: [],
+      filteredTrials: [],
+      pairMeta: new Map(),
+      positionCloud: [],
+      stimulusSetChoices: new Set()
     };
 
-    Plotly.newPlot('plot-container', plotData, layout);
-  }
-</script>
+    function setResponse(message) {
+      document.getElementById('response').textContent = message;
+    }
+
+    function sendCommand(command) {
+      const payload = { ...command };
+      if (payload.do === 'reward') {
+        const rewardDuration = Number(document.getElementById('reward-duration').value);
+        if (Number.isFinite(rewardDuration) && rewardDuration > 0) {
+          payload.reward_duration = rewardDuration;
+        }
+      }
+      socket.emit('command', payload);
+      setResponse(`Sent ${payload.do}`);
+    }
+
+    function asArray(value) {
+      if (Array.isArray(value)) return value;
+      if (typeof value === 'string') {
+        try {
+          const parsed = JSON.parse(value);
+          if (Array.isArray(parsed)) return parsed;
+        } catch (error) {
+          return value.split(',').map(item => item.trim());
+        }
+      }
+      return [];
+    }
+
+    function asNumberArray(value) {
+      return asArray(value)
+        .map(Number)
+        .filter(number => Number.isFinite(number));
+    }
+
+    function asPoint(value) {
+      const point = asArray(value).map(Number);
+      if (point.length < 2 || !Number.isFinite(point[0]) || !Number.isFinite(point[1])) {
+        return null;
+      }
+      return [point[0], point[1]];
+    }
+
+    function asLocationPair(value) {
+      const raw = asArray(value);
+      if (raw.length < 2) return [];
+      const points = raw.slice(0, 2).map(asPoint).filter(Boolean);
+      return points.length === 2 ? points : [];
+    }
+
+    function payloadFor(record) {
+      if (record && record.data && typeof record.data === 'object' && !Array.isArray(record.data)) {
+        return record.data;
+      }
+      return {};
+    }
+
+    function field(record, payload, name, fallback = null) {
+      if (record && record[name] !== undefined && record[name] !== null) return record[name];
+      if (payload && payload[name] !== undefined && payload[name] !== null) return payload[name];
+      return fallback;
+    }
+
+    function parseTimestamp(record, payload) {
+      const date = field(record, payload, 'date');
+      const time = field(record, payload, 'time');
+      if (!date || !time) return null;
+      const safeTime = String(time).replace(/(\.\d{3})\d+/, '$1');
+      const timestamp = new Date(`${date}T${safeTime}`);
+      return Number.isNaN(timestamp.getTime()) ? null : timestamp;
+    }
+
+    function inferStimulusSet(record, payload, condition, block) {
+      const conditionMatch = String(condition || '').match(/^set(\d+)_/);
+      if (conditionMatch) return Number(conditionMatch[1]);
+
+      const blockMatch = String(block || '').match(/stimulus_set_(\d+)/);
+      if (blockMatch) return Number(blockMatch[1]);
+
+      const explicit = field(record, payload, 'stimulus_set', field(record, payload, 'stimulusSet'));
+      const explicitNumber = Number(explicit);
+      if (Number.isFinite(explicitNumber)) return explicitNumber;
+
+      return null;
+    }
+
+    function normalizeTrial(key, record) {
+      const payload = payloadFor(record);
+      const trialid = Number(field(record, payload, 'trialid', key));
+      const outcome = String(field(record, payload, 'outcome', '')).toLowerCase();
+      const block = field(record, payload, 'block', 'N/A');
+      const condition = field(record, payload, 'condition', 'N/A');
+      return {
+        key,
+        raw: record,
+        payload,
+        trialid: Number.isFinite(trialid) ? trialid : Number(key),
+        block,
+        blockNumber: field(record, payload, 'block_number', 'N/A'),
+        condition,
+        stimulusSet: inferStimulusSet(record, payload, condition, block),
+        outcome,
+        magnitudes: asNumberArray(field(record, payload, 'magnitudes', [])),
+        locations: asLocationPair(field(record, payload, 'locations', [])),
+        timestamp: parseTimestamp(record, payload)
+      };
+    }
+
+    function normalizeData(data) {
+      return Object.entries(data || {})
+        .map(([key, record]) => normalizeTrial(key, record))
+        .sort((a, b) => a.trialid - b.trialid);
+    }
+
+    function selectedFilterMode() {
+      return document.querySelector('input[name="filter_mode"]:checked')?.value || 'all';
+    }
+
+    function stimulusSetsIn(trials) {
+      return Array.from(new Set(
+        trials
+          .map(trial => trial.stimulusSet)
+          .filter(value => Number.isFinite(value))
+      )).sort((a, b) => a - b);
+    }
+
+    function selectedStimulusSets() {
+      return new Set(
+        Array.from(document.querySelectorAll('#stimulus-set-filter input:checked'))
+          .map(input => Number(input.value))
+          .filter(value => Number.isFinite(value))
+      );
+    }
+
+    function syncStimulusSetFilter(trials) {
+      const availableSets = stimulusSetsIn(trials);
+      const filter = document.getElementById('stimulus-set-filter');
+      const existing = new Set(Array.from(filter.querySelectorAll('input')).map(input => Number(input.value)));
+      const changed = availableSets.length !== existing.size || availableSets.some(setId => !existing.has(setId));
+      if (!changed) return;
+
+      const previousChoices = state.stimulusSetChoices.size
+        ? state.stimulusSetChoices
+        : new Set(availableSets);
+      filter.innerHTML = availableSets.map(setId => {
+        const checked = previousChoices.has(setId) ? 'checked' : '';
+        return `<label class="checkbox-chip">
+          <input type="checkbox" name="stimulus_set_filter" value="${setId}" ${checked}>
+          <span>Set ${setId}</span>
+        </label>`;
+      }).join('');
+
+      filter.querySelectorAll('input').forEach(input => {
+        input.addEventListener('change', renderDashboard);
+      });
+    }
+
+    function trialRange() {
+      const raw = document.getElementById('trial-start').value.trim();
+      if (!raw) return [null, null];
+      const parts = raw.split(':');
+      const start = Number(parts[0]);
+      const end = Number(parts[1] ?? parts[0]);
+      return [
+        Number.isFinite(start) ? start : null,
+        Number.isFinite(end) ? end : null
+      ];
+    }
+
+    function applyFilter(trials) {
+      const mode = selectedFilterMode();
+      let filtered = trials;
+      const selectedSets = selectedStimulusSets();
+      if (selectedSets.size > 0) {
+        filtered = filtered.filter(trial =>
+          !Number.isFinite(trial.stimulusSet) || selectedSets.has(trial.stimulusSet)
+        );
+      } else if (stimulusSetsIn(trials).length > 0) {
+        filtered = [];
+      }
+
+      if (mode === 'recent') {
+        const n = Math.max(1, Number(document.getElementById('recent-count').value) || 50);
+        return filtered.slice(-n);
+      }
+      if (mode === 'trial') {
+        const [start, end] = trialRange();
+        return filtered.filter(trial => {
+          if (start !== null && trial.trialid < start) return false;
+          if (end !== null && trial.trialid > end) return false;
+          return true;
+        });
+      }
+      if (mode === 'clock') {
+        const startValue = document.getElementById('time-start').value;
+        const endValue = document.getElementById('time-end').value;
+        const start = startValue ? new Date(startValue) : null;
+        const end = endValue ? new Date(endValue) : null;
+        return filtered.filter(trial => {
+          if (!trial.timestamp) return false;
+          if (start && trial.timestamp < start) return false;
+          if (end && trial.timestamp > end) return false;
+          return true;
+        });
+      }
+      return filtered;
+    }
+
+    function roundedPoint(point) {
+      return [Number(point[0].toFixed(4)), Number(point[1].toFixed(4))];
+    }
+
+    function pointKey(point) {
+      return roundedPoint(point).join(',');
+    }
+
+    function valuePairForTrial(trial) {
+      const [mag1, mag2] = trial.magnitudes;
+      const [loc1, loc2] = trial.locations;
+      if (mag1 === mag2) return null;
+      const highPoint = mag1 > mag2 ? loc1 : loc2;
+      const lowPoint = mag1 > mag2 ? loc2 : loc1;
+      return {
+        highPoint: roundedPoint(highPoint),
+        lowPoint: roundedPoint(lowPoint),
+      };
+    }
+
+    function valuePairKey(pair) {
+      return `high:${pointKey(pair.highPoint)}|low:${pointKey(pair.lowPoint)}`;
+    }
+
+    function keyToValuePair(key) {
+      const match = key.match(/^high:([^|]+)\|low:(.+)$/);
+      if (!match) return { highPoint: [0, 0], lowPoint: [0, 0] };
+      return {
+        highPoint: match[1].split(',').map(Number),
+        lowPoint: match[2].split(',').map(Number),
+      };
+    }
+
+    function uniquePositions(trials) {
+      const seen = new Map();
+      trials.forEach(trial => {
+        trial.locations.forEach(point => {
+          const key = roundedPoint(point).join(',');
+          if (!seen.has(key)) seen.set(key, roundedPoint(point));
+        });
+      });
+      return Array.from(seen.values());
+    }
+
+    function formatPercent(value) {
+      if (!Number.isFinite(value)) return 'N/A';
+      return `${Math.round(value * 100)}%`;
+    }
+
+    function escapeHtml(value) {
+      return String(value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    function scoredChoiceTrials(trials) {
+      return trials.filter(trial =>
+        trial.magnitudes.length === 2 &&
+        trial.locations.length === 2 &&
+        (trial.outcome === 'correct' || trial.outcome === 'incorrect')
+      );
+    }
+
+    function updateCurrentTrial(trials) {
+      const latest = trials[trials.length - 1];
+      document.getElementById('trialid').textContent = latest?.trialid ?? 'N/A';
+      document.getElementById('condition').textContent = latest?.condition ?? 'N/A';
+      document.getElementById('block').textContent = latest?.block ?? 'N/A';
+      document.getElementById('block_number').textContent = latest?.blockNumber ?? 'N/A';
+    }
+
+    function updateStats(filteredTrials) {
+      const choice = filteredTrials.filter(trial => trial.magnitudes.length === 2);
+      const scored = scoredChoiceTrials(filteredTrials);
+      const correct = scored.filter(trial => trial.outcome === 'correct').length;
+      const timeouts = choice.filter(trial => trial.outcome === 'timeout').length;
+      document.getElementById('stat-records').textContent = filteredTrials.length;
+      document.getElementById('stat-choice').textContent = choice.length;
+      document.getElementById('stat-accuracy').textContent = formatPercent(correct / scored.length);
+      document.getElementById('stat-timeouts').textContent = timeouts;
+      document.getElementById('filter-readout').textContent = `${filteredTrials.length} of ${state.trials.length} records shown`;
+    }
+
+    function updateSummaryTable(filteredTrials) {
+      const groups = new Map();
+      filteredTrials.forEach(trial => {
+        const key = String(trial.blockNumber ?? 'N/A');
+        if (!groups.has(key)) {
+          groups.set(key, { blockNumber: key, block: trial.block, trials: 0, correct: 0, incorrect: 0, timeout: 0 });
+        }
+        const group = groups.get(key);
+        group.trials += 1;
+        if (trial.outcome === 'correct') group.correct += 1;
+        if (trial.outcome === 'incorrect') group.incorrect += 1;
+        if (trial.outcome === 'timeout') group.timeout += 1;
+      });
+
+      const rows = Array.from(groups.values()).sort((a, b) => {
+        const an = Number(a.blockNumber);
+        const bn = Number(b.blockNumber);
+        if (Number.isFinite(an) && Number.isFinite(bn)) return an - bn;
+        return String(a.blockNumber).localeCompare(String(b.blockNumber));
+      });
+
+      const tbody = document.querySelector('#summary-table tbody');
+      if (rows.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7">No records in this window.</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = rows.map(row => {
+        const scored = row.correct + row.incorrect;
+        const accuracy = scored > 0 ? row.correct / scored : NaN;
+        return `<tr>
+          <td>${escapeHtml(row.blockNumber)}</td>
+          <td>${escapeHtml(row.block)}</td>
+          <td>${row.trials}</td>
+          <td>${row.correct}</td>
+          <td>${row.incorrect}</td>
+          <td>${row.timeout}</td>
+          <td>${formatPercent(accuracy)}</td>
+        </tr>`;
+      }).join('');
+    }
+
+    function buildPlotGroups(filteredTrials) {
+      const groups = new Map();
+      scoredChoiceTrials(filteredTrials).forEach(trial => {
+        const diff = Math.abs(trial.magnitudes[0] - trial.magnitudes[1]);
+        const valuePair = valuePairForTrial(trial);
+        if (!valuePair) return;
+        const key = valuePairKey(valuePair);
+        if (!groups.has(key)) groups.set(key, new Map());
+        const byDiff = groups.get(key);
+        if (!byDiff.has(diff)) byDiff.set(diff, { correct: 0, total: 0 });
+        const bucket = byDiff.get(diff);
+        bucket.total += 1;
+        if (trial.outcome === 'correct') bucket.correct += 1;
+      });
+      return groups;
+    }
+
+    function orderedPairKeys(groups) {
+      return Array.from(groups.keys()).sort((a, b) => {
+        const ap = keyToValuePair(a).highPoint || [0, 0];
+        const bp = keyToValuePair(b).highPoint || [0, 0];
+        return Math.atan2(ap[1], ap[0]) - Math.atan2(bp[1], bp[0]);
+      });
+    }
+
+    function updatePlot(filteredTrials) {
+      const groups = buildPlotGroups(filteredTrials);
+      const keys = orderedPairKeys(groups);
+      state.pairMeta = new Map();
+
+      const traces = keys.map((key, index) => {
+        const color = palette[index % palette.length];
+        const valuePair = keyToValuePair(key);
+        const byDiff = groups.get(key);
+        const x = Array.from(byDiff.keys()).sort((a, b) => a - b);
+        const y = x.map(diff => byDiff.get(diff).correct / byDiff.get(diff).total);
+        const customdata = x.map(diff => {
+          const bucket = byDiff.get(diff);
+          return [bucket.correct, bucket.total];
+        });
+        state.pairMeta.set(key, {
+          label: `Pair ${index + 1}`,
+          color,
+          highPoint: valuePair.highPoint,
+          lowPoint: valuePair.lowPoint,
+        });
+        return {
+          x,
+          y,
+          customdata,
+          mode: 'lines+markers',
+          name: `Pair ${index + 1}`,
+          line: { color, width: 3 },
+          marker: { color, size: 8, line: { color: '#ffffff', width: 1 } },
+          hovertemplate: 'Value difference %{x}<br>Accuracy %{y:.0%}<br>%{customdata[0]} / %{customdata[1]} correct<extra></extra>',
+          connectgaps: false
+        };
+      });
+
+      const allDiffs = traces.flatMap(trace => trace.x);
+      const minX = allDiffs.length ? Math.min(...allDiffs) : 0;
+      const maxX = allDiffs.length ? Math.max(...allDiffs) : 1;
+      const layout = {
+        margin: { l: 58, r: 18, t: 18, b: 58 },
+        paper_bgcolor: '#ffffff',
+        plot_bgcolor: '#ffffff',
+        showlegend: false,
+        xaxis: {
+          title: { text: 'Absolute value difference' },
+          dtick: 1,
+          rangemode: 'tozero',
+          zeroline: false,
+          gridcolor: '#edf1f6'
+        },
+        yaxis: {
+          title: { text: 'Performance' },
+          range: [-0.03, 1.03],
+          tickformat: '.0%',
+          dtick: 0.25,
+          gridcolor: '#edf1f6'
+        },
+        shapes: [{
+          type: 'line',
+          x0: minX,
+          x1: maxX,
+          y0: 0.5,
+          y1: 0.5,
+          line: { color: '#8a94a6', width: 1, dash: 'dash' }
+        }],
+        annotations: traces.length === 0 ? [{
+          text: 'No scored choice trials in this window',
+          x: 0.5,
+          y: 0.5,
+          xref: 'paper',
+          yref: 'paper',
+          showarrow: false,
+          font: { color: '#657083', size: 14 }
+        }] : []
+      };
+
+      Plotly.react('plot-container', traces, layout, { responsive: true, displaylogo: false });
+      updatePairLegend(groups, keys);
+    }
+
+    function svgPoint(point) {
+      const x = 4 + ((point[0] + 1) / 2) * 56;
+      const y = 4 + ((1 - point[1]) / 2) * 56;
+      return [x, y];
+    }
+
+    function pairGlyph(meta) {
+      const selectedKeys = new Set([
+        pointKey(meta.highPoint),
+        pointKey(meta.lowPoint),
+      ]);
+      const background = state.positionCloud
+        .filter(point => !selectedKeys.has(pointKey(point)))
+        .map(point => {
+          const [x, y] = svgPoint(point);
+          return `<circle cx="${x}" cy="${y}" r="2.8" fill="#d8dee5"></circle>`;
+        }).join('');
+      const [highX, highY] = svgPoint(meta.highPoint);
+      const [lowX, lowY] = svgPoint(meta.lowPoint);
+      return `<svg class="pair-glyph" viewBox="0 0 64 64" aria-hidden="true">
+        <title>${meta.label}: higher and lower value locations</title>
+        <circle cx="32" cy="32" r="26" fill="none" stroke="#edf1f6" stroke-width="1"></circle>
+        ${background}
+        <circle cx="${lowX}" cy="${lowY}" r="4.8" fill="#c2410c"></circle>
+        <circle cx="${highX}" cy="${highY}" r="4.8" fill="#1f7a4d"></circle>
+      </svg>`;
+    }
+
+    function updatePairLegend(groups, keys) {
+      const legend = document.getElementById('pair-legend');
+      if (keys.length === 0) {
+        legend.innerHTML = '<div class="legend-text"><span>No pair data in this window.</span></div>';
+        return;
+      }
+
+      legend.innerHTML = keys.map(key => {
+        const meta = state.pairMeta.get(key);
+        const total = Array.from(groups.get(key).values()).reduce((sum, bucket) => sum + bucket.total, 0);
+        return `<div class="legend-item">
+          <span class="legend-swatch" style="background:${meta.color}"></span>
+          ${pairGlyph(meta)}
+          <span class="legend-text">
+            <strong>${meta.label}</strong>
+            <span>${total} scored</span>
+          </span>
+        </div>`;
+      }).join('');
+    }
+
+    function renderDashboard() {
+      state.stimulusSetChoices = selectedStimulusSets();
+      state.filteredTrials = applyFilter(state.trials);
+      state.positionCloud = uniquePositions(state.trials);
+      updateCurrentTrial(state.trials);
+      updateStats(state.filteredTrials);
+      updateSummaryTable(state.filteredTrials);
+      updatePlot(state.filteredTrials);
+    }
+
+    function fetchBehaviour() {
+      fetch('/behaviour_summary', { cache: 'no-store' })
+        .then(response => response.json())
+        .then(data => {
+          state.rawData = data || {};
+          state.trials = normalizeData(state.rawData);
+          syncStimulusSetFilter(state.trials);
+          renderDashboard();
+        })
+        .catch(error => {
+          console.error('Error fetching behaviour data', error);
+          setResponse('Could not fetch behaviour data');
+        });
+    }
+
+    function downloadLatestBehaviour() {
+      const jsonStr = JSON.stringify(state.rawData || {}, null, 2);
+      const blob = new Blob([jsonStr], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'behaviour_latest.json';
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    }
+
+    function resetFilters() {
+      document.getElementById('filter-all').checked = true;
+      document.getElementById('recent-count').value = 50;
+      document.getElementById('trial-start').value = '';
+      document.getElementById('time-start').value = '';
+      document.getElementById('time-end').value = '';
+      document.querySelectorAll('#stimulus-set-filter input').forEach(input => {
+        input.checked = true;
+      });
+      renderDashboard();
+    }
+
+    document.querySelectorAll('[data-command]').forEach(button => {
+      button.addEventListener('click', () => {
+        sendCommand(JSON.parse(button.dataset.command));
+      });
+    });
+
+    document.getElementById('download-latest').addEventListener('click', downloadLatestBehaviour);
+    document.getElementById('reset-filter').addEventListener('click', resetFilters);
+    document.getElementById('filter-form').addEventListener('input', renderDashboard);
+    document.getElementById('filter-form').addEventListener('change', renderDashboard);
+
+    socket.on('response', data => {
+      if (data && data.message) setResponse(data.message);
+    });
+    socket.on('trial_end', fetchBehaviour);
+
+    fetchBehaviour();
+    window.setInterval(fetchBehaviour, 5000);
+  </script>
+</body>
 </html>

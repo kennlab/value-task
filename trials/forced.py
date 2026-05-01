@@ -29,7 +29,8 @@ class ForcedChoiceTrial(Trial):
         bbox: Optional[T_BBOX_SPEC]=None,
         reward_channels: Tuple[int, ...]=(1, 2),
         center=CENTER,
-        allow_outside_touch=True
+        allow_outside_touch=True,
+        stimulus_set: int | None = None,
     ):
         super().__init__()
         self.stimulus = stimulus
@@ -47,6 +48,7 @@ class ForcedChoiceTrial(Trial):
         self.timeout_duration = 2.0
         self.center = center
         self.allow_outside_touch = allow_outside_touch
+        self.stimulus_set = stimulus_set
     
     @classmethod
     def from_config(cls, config: dict) -> 'ForcedChoiceTrial':
@@ -61,6 +63,7 @@ class ForcedChoiceTrial(Trial):
         center = tuple(config['locations'].get('center', cls.CENTER))
         
         allow_outside_touch=config.get("allow_outside_touch", True)
+        stimulus_set = config.get('stimulus_set')
         return cls(
             stimulus=stimulus,
             magnitude=magnitude,
@@ -71,7 +74,8 @@ class ForcedChoiceTrial(Trial):
             bbox=bbox,
             reward_channels=reward_channels,
             center=center,
-            allow_outside_touch=allow_outside_touch
+            allow_outside_touch=allow_outside_touch,
+            stimulus_set=stimulus_set,
         )
 
     def get_reward_scene(self, mgr, reward_params) -> Scene:
@@ -91,7 +95,13 @@ class ForcedChoiceTrial(Trial):
 
     def run(self, mgr) -> TrialResult:
         reward_params = self.magnitude_mapping[self.magnitude]
-        data = {"stimulus": self.stimulus, "magnitude": self.magnitude, "location": self.loc, "reward_params": reward_params}
+        data = {
+            "stimulus": self.stimulus,
+            "magnitude": self.magnitude,
+            "location": self.loc,
+            "reward_params": reward_params,
+            "stimulus_set": self.stimulus_set,
+        }
 
         target = ImageAdapter(
             image=self.stimulus,

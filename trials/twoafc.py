@@ -30,7 +30,8 @@ class TwoAFCTrial(Trial):
         reward_channels: Tuple[int, ...]=(1, 2),
         center=CENTER,
         cue_incorrect: bool = False,
-        reward_feedback_method: str = 'bar_height'
+        reward_feedback_method: str = 'bar_height',
+        stimulus_set: int | None = None,
     ):
         super().__init__()
         self.options = options
@@ -49,6 +50,7 @@ class TwoAFCTrial(Trial):
         self.center = center
         self.cue_incorrect = cue_incorrect
         self.reward_feedback_method = reward_feedback_method
+        self.stimulus_set = stimulus_set
     
     @classmethod
     def from_config(cls, config: dict) -> 'TwoAFCTrial':
@@ -63,6 +65,7 @@ class TwoAFCTrial(Trial):
         center = tuple(config['locations'].get('center', cls.CENTER))
         cue_incorrect = config.get('cue_incorrect', False)
         reward_feedback_method = config.get('reward_feedback_method', 'bar_height')
+        stimulus_set = config.get('stimulus_set')
         return cls(
             options=options,
             magnitudes=magnitudes,
@@ -73,7 +76,9 @@ class TwoAFCTrial(Trial):
             bbox=bbox,
             reward_channels=reward_channels,
             center=center,
-            cue_incorrect=cue_incorrect
+            cue_incorrect=cue_incorrect,
+            reward_feedback_method=reward_feedback_method,
+            stimulus_set=stimulus_set,
         )
 
     def get_reward_scene(self, mgr, reward_params, magnitude_level, background) -> Scene:
@@ -109,7 +114,8 @@ class TwoAFCTrial(Trial):
             "options": self.options, 
             "magnitudes": self.magnitudes, 
             "locations": self.locs, 
-            "reward_params": reward_params
+            "reward_params": reward_params,
+            "stimulus_set": self.stimulus_set,
         }
         targets = {
             'option1': ImageAdapter(

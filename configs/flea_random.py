@@ -1,19 +1,58 @@
-import numpy as np
 from typing import Dict, Any
 from itertools import product, combinations
+import os
 
+import numpy as np
+import pandas as pd
+
+DISPLAY_SIZE = (1920, 1080)
+ASPECT_RATIO = DISPLAY_SIZE[0] / DISPLAY_SIZE[1]
+STIMULUS_WIDTH = 0.3
+STIMULUS_HEIGHT = STIMULUS_WIDTH * ASPECT_RATIO
+STIMULUS_SIZE = (STIMULUS_WIDTH, STIMULUS_HEIGHT)
+BBOX_RATIO = 1.5
+STIMULUS_BBOX = {'width': STIMULUS_WIDTH * BBOX_RATIO, 'height': STIMULUS_HEIGHT * BBOX_RATIO}
+N_POSITIONS = 6
+RADIUS = 0.5
+ANGLES = np.arange(N_POSITIONS) * (360/N_POSITIONS) * np.pi/180
+x, y = RADIUS * np.cos(ANGLES), RADIUS * np.sin(ANGLES)
+STIMULUS_LOCATIONS = list(zip(x, y))
+LOCATIONS: Dict[int|str, tuple] = {
+    'center': (0.0, 0.0),
+}
+for i, (x, y) in enumerate(STIMULUS_LOCATIONS):
+    LOCATIONS[i] = (x, y)
+locations = range(N_POSITIONS)
+location_pairs = [(i, (i+(N_POSITIONS//2))%N_POSITIONS) for i in locations]
+MAGNITUDES = tuple(range(1, 6))
+
+# Edit this to choose which stimulus sets can appear in a session.
+ENABLED_STIMULUS_SETS = (1, 2, 3, 4, 5)
+TRIALS_PER_STIMULUS_SET_BLOCK = 50
 
 config: Dict[str, Any] = dict(
     name='fleabottom',
+    coordinate_space='ndc',
+    storage={'type': 'sqlite', 'path': 'data/data.db'},
     duration=10,
-    size=(200,200),
-    bbox=dict(width=300, height=300),
+    size=STIMULUS_SIZE,
+    bbox=STIMULUS_BBOX,
     allow_outside_touch=True,
     ITI=1.5,
     cue_incorrect=True,
-    reward_feedback_method='bar_height'
+    reward_feedback_method='bar_height',
+    locations=LOCATIONS,
+    display={
+        'size': DISPLAY_SIZE,
+        'display': 0,
+        'fullscreen': True
+    },
+    remote_server={
+        'enabled': True,
+        'show': False,
+        'template_path': 'server',
+    }
 )
-import os
 config['io'] = {
     'reward': {
         'type': 'ISMATEC_SERIAL',
@@ -25,40 +64,7 @@ config['io'] = {
     }
 }
 
-SIZE = 1920, 1080
-orientation = 'portrait'
-# orientation = 'landscape'
-if orientation == 'portrait':
-    SIZE = SIZE[1], SIZE[0]
-
-CENTER = SIZE[0]//2, SIZE[1]//2
-X_OFFSET = 200
-Y_OFFSET = 200
-RADIUS = 400
-N_POSITIONS = 6
-START_ANGLE = 0
-angle_offsets = START_ANGLE + (2*np.pi / N_POSITIONS) * np.arange(N_POSITIONS)
-X, Y = CENTER[0]+RADIUS*np.cos(angle_offsets), CENTER[1]+RADIUS*np.sin(angle_offsets)
-
-config['locations'] = {
-    'center': CENTER,
-}
-for i, (x, y) in enumerate(zip(X, Y)):
-    config['locations'][i] = (x, y)
-
-config['display'] = {
-    'size': SIZE,
-    'display': 0,
-    'fullscreen': True
-}
-
-config['remote_server'] = {
-    'enabled': True,
-    'show': False,
-    'template_path': 'server',
-}
-
-magnitudes = range(1, 6)
+magnitudes = MAGNITUDES
 reward_duration = 0.4  # in seconds
 interpulse_interval = 0.2  # in seconds
 config['reward_channels'] = ('1','4')
@@ -66,63 +72,79 @@ config['magnitude_mapping'] = {
     mag: {'duration': reward_duration*mag, 'n_pulses': 1, 'interpulse_interval': 0}
     for mag in magnitudes
 }
-# # stimulus set 1
-# images = [f'stimuli/aada{chr(97+i)}.png' for i in range(5)]
-# # stimulus set 2
-# images = [f'stimuli/aada{chr(97+5+i)}.png' for i in range(5)]
-# stimulus set 3
-images = [f'stimuli/aada{chr(97+10+i)}.png' for i in range(5)]
-config['items'] = dict(zip(magnitudes, images))
+
+image_data = pd.read_csv('stimuli/stimuli.csv')
+STIMULUS_SETS = {
+    int(stimulus_set_id): {
+        int(row.magnitude): row.image
+        for row in group.itertuples(index=False)
+    }
+    for stimulus_set_id, group in image_data.groupby('stimulus_set_id')
+}
+if not ENABLED_STIMULUS_SETS:
+    raise ValueError("ENABLED_STIMULUS_SETS must contain at least one stimulus set.")
+unknown_sets = set(ENABLED_STIMULUS_SETS) - set(STIMULUS_SETS)
+if unknown_sets:
+    raise ValueError(f"Unknown stimulus sets requested: {sorted(unknown_sets)}")
+missing_magnitudes = {
+    set_id: sorted(set(magnitudes) - set(STIMULUS_SETS[set_id]))
+    for set_id in ENABLED_STIMULUS_SETS
+    if set(magnitudes) - set(STIMULUS_SETS[set_id])
+}
+if missing_magnitudes:
+    raise ValueError(f"Stimulus sets are missing magnitudes: {missing_magnitudes}")
+
+config['stimulus_sets'] = STIMULUS_SETS
+# Fallback only; each generated condition below overrides items with its own
+# stimulus set so trials never mix images across sets.
+config['items'] = STIMULUS_SETS[ENABLED_STIMULUS_SETS[0]]
 
 forced_choice_trials = {
-    f'f{mag}{loc}': dict(
+    f'set{set_id}_forced_m{mag}_loc{loc}': dict(
+        stimulus_set=set_id,
+        items=STIMULUS_SETS[set_id],
         magnitude=mag,
         loc=loc,
         trial_type='forced'
     )
-    for mag, loc in product(magnitudes, ['left', 'right'])
+    for set_id in ENABLED_STIMULUS_SETS
+    for mag, loc in product(magnitudes, locations)
 }
 
-locations = range(N_POSITIONS)
-location_pairs = [(i, (i+(N_POSITIONS//2))%N_POSITIONS) for i in locations]
-
 two_afc_trials = {
-    i: dict(
+    f'set{set_id}_choice_m{option1}v{option2}_loc{locs[0]}v{locs[1]}': dict(
+        stimulus_set=set_id,
+        items=STIMULUS_SETS[set_id],
         magnitudes=(option1, option2),
         locs=locs,
         trial_type='choice'
     )
-    for i, ((option1, option2), locs) in enumerate(product(combinations(magnitudes, 2), location_pairs))
+    for set_id in ENABLED_STIMULUS_SETS
+    for (option1, option2), locs in product(combinations(magnitudes, 2), location_pairs)
 }
 
 config['conditions'] = {**forced_choice_trials, **two_afc_trials}
 
-# design the block structure
+# Random 50-trial blocks by stimulus set. Each block includes all magnitude
+# combinations and all opposite-position pairings for that stimulus set.
+stimulus_set_block_names = {
+    set_id: f'stimulus_set_{set_id}'
+    for set_id in ENABLED_STIMULUS_SETS
+}
 blocks = {}
-# we will have blocks of 2AFC trials mixing all magnitude levels, starting with easy trials
-for value_difference in range(4, 0, -1):
-    condition_list = []
-    for condition, info in two_afc_trials.items():
-        op1, op2 = info.get('magnitudes')
-        if abs(op1-op2)==value_difference:
-            condition_list.append(condition)
-
-    current_block = f'valuediff{value_difference:d}'
-    next_block = f'valuediff{max(value_difference-1, 1):d}'
-    # previous_block = f'valuediff{min(value_difference+1, 4):d}'
-    if value_difference == 4:
-        previous_block = 0 if 0 in blocks else 'valuediff4'
-    else:
-        previous_block = f'valuediff{value_difference+1:d}'
+for set_id in ENABLED_STIMULUS_SETS:
+    current_block = stimulus_set_block_names[set_id]
+    next_from = list(set(stimulus_set_block_names.values()) - {current_block})
     blocks[current_block] = dict(
-        conditions=condition_list,
-        length=10,
-        retry={'timeout': True},
-        transition=[
-            {'condition': {'outcome': 'correct', 'min': 8}, 'next': next_block},
-            {'condition': {'outcome': 'correct', 'min': 6}, 'next': current_block},
-            {'next': previous_block}
+        stimulus_set=set_id,
+        conditions=[
+            condition_name
+            for condition_name, condition in two_afc_trials.items()
+            if condition['stimulus_set'] == set_id
         ],
+        length=TRIALS_PER_STIMULUS_SET_BLOCK,
+        retry={'timeout': True},
+        transition=[{'next_from': next_from}],
         method='random'
     )
 
@@ -145,7 +167,9 @@ config['hotkeys'] = {
     '7': {'do': 'unpause'},
     '5': {'do': 'quit'}
 }
-
+config['valid_times'] = [
+    {'start': '08:00', 'end': '18:00'}
+]
 if __name__ == '__main__':
     import pprint
     pprint.pprint(config)
