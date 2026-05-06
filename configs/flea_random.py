@@ -23,7 +23,7 @@ LOCATIONS: Dict[int|str, tuple] = {
 for i, (x, y) in enumerate(STIMULUS_LOCATIONS):
     LOCATIONS[i] = (x, y)
 locations = range(N_POSITIONS)
-location_pairs = [(i, (i+(N_POSITIONS//2))%N_POSITIONS) for i in locations]
+location_pairs = pd.read_csv('configs/locs.csv', index_col=0).loc[:, ['x','y']].values.tolist()
 MAGNITUDES = tuple(range(1, 6))
 
 # Edit this to choose which stimulus sets can appear in a session.

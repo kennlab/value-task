@@ -595,7 +595,7 @@
 
       <div class="stats-grid">
         {{ stat_tile('Records', 'stat-records', 'filtered') }}
-        {{ stat_tile('Choice Trials', 'stat-choice', 'non-forced') }}
+        {{ stat_tile('Completed Choices', 'stat-choice', 'correct + incorrect') }}
         {{ stat_tile('Accuracy', 'stat-accuracy', 'correct / scored') }}
         {{ stat_tile('Timeouts', 'stat-timeouts', 'choice trials') }}
       </div>
@@ -662,7 +662,10 @@
 
   <script>
     const socket = io.connect(window.location.origin);
-    const palette = ['#087f8c', '#b45309', '#5b5fc7', '#1f7a4d', '#c2410c', '#7c3aed', '#be185d'];
+    const palette = [
+      '#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd',
+      '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf'
+    ];
     const state = {
       rawData: {},
       trials: [],
@@ -929,6 +932,10 @@
       return `${Math.round(value * 100)}%`;
     }
 
+    function formatPoint(point) {
+      return `(${point[0].toFixed(2)}, ${point[1].toFixed(2)})`;
+    }
+
     function escapeHtml(value) {
       return String(value)
         .replace(/&/g, '&amp;')
@@ -960,7 +967,7 @@
       const correct = scored.filter(trial => trial.outcome === 'correct').length;
       const timeouts = choice.filter(trial => trial.outcome === 'timeout').length;
       document.getElementById('stat-records').textContent = filteredTrials.length;
-      document.getElementById('stat-choice').textContent = choice.length;
+      document.getElementById('stat-choice').textContent = scored.length;
       document.getElementById('stat-accuracy').textContent = formatPercent(correct / scored.length);
       document.getElementById('stat-timeouts').textContent = timeouts;
       document.getElementById('filter-readout').textContent = `${filteredTrials.length} of ${state.trials.length} records shown`;
@@ -1044,12 +1051,15 @@
         const byDiff = groups.get(key);
         const x = Array.from(byDiff.keys()).sort((a, b) => a - b);
         const y = x.map(diff => byDiff.get(diff).correct / byDiff.get(diff).total);
+        const pairLabel = `Pair ${index + 1}`;
+        const pairDescription = `High ${formatPoint(valuePair.highPoint)}; low ${formatPoint(valuePair.lowPoint)}`;
         const customdata = x.map(diff => {
           const bucket = byDiff.get(diff);
-          return [bucket.correct, bucket.total];
+          return [pairLabel, pairDescription, bucket.correct, bucket.total];
         });
         state.pairMeta.set(key, {
-          label: `Pair ${index + 1}`,
+          label: pairLabel,
+          description: pairDescription,
           color,
           highPoint: valuePair.highPoint,
           lowPoint: valuePair.lowPoint,
@@ -1059,10 +1069,10 @@
           y,
           customdata,
           mode: 'lines+markers',
-          name: `Pair ${index + 1}`,
+          name: pairLabel,
           line: { color, width: 3 },
           marker: { color, size: 8, line: { color: '#ffffff', width: 1 } },
-          hovertemplate: 'Value difference %{x}<br>Accuracy %{y:.0%}<br>%{customdata[0]} / %{customdata[1]} correct<extra></extra>',
+          hovertemplate: '<b>%{customdata[0]}</b><br>%{customdata[1]}<br>Value difference %{x}<br>Accuracy %{y:.0%}<br>%{customdata[2]} / %{customdata[3]} correct<extra></extra>',
           connectgaps: false
         };
       });
@@ -1150,7 +1160,7 @@
       legend.innerHTML = keys.map(key => {
         const meta = state.pairMeta.get(key);
         const total = Array.from(groups.get(key).values()).reduce((sum, bucket) => sum + bucket.total, 0);
-        return `<div class="legend-item">
+        return `<div class="legend-item" title="${escapeHtml(meta.description)}">
           <span class="legend-swatch" style="background:${meta.color}"></span>
           ${pairGlyph(meta)}
           <span class="legend-text">
