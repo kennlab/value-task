@@ -5,7 +5,7 @@ import os
 import numpy as np
 import pandas as pd
 
-DISPLAY_SIZE = (1920, 1080)
+DISPLAY_SIZE = (1080, 1920)
 ASPECT_RATIO = DISPLAY_SIZE[0] / DISPLAY_SIZE[1]
 STIMULUS_WIDTH = 0.3
 STIMULUS_HEIGHT = STIMULUS_WIDTH * ASPECT_RATIO
@@ -65,7 +65,7 @@ config['io'] = {
 }
 
 magnitudes = MAGNITUDES
-reward_duration = 0.4  # in seconds
+reward_duration = 0.8  # in seconds
 interpulse_interval = 0.2  # in seconds
 config['reward_channels'] = ('1','4')
 config['magnitude_mapping'] = {
