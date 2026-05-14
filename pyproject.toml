@@ -19,4 +19,5 @@ experiment = { git = "https://github.com/jselvan/experiment" }
 dev = [
     "seaborn>=0.13.2",
     "statsmodels>=0.14.6",
+    "pytest>=9.0.3",
 ]
