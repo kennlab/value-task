@@ -1,0 +1,43 @@
+{
+  "magnitude_cues": [
+    {"imageid": 0, "stimulus_set_id": 1, "magnitude": 1, "image": "stimuli/aadaa.png"},
+    {"imageid": 1, "stimulus_set_id": 1, "magnitude": 2, "image": "stimuli/aadab.png"},
+    {"imageid": 2, "stimulus_set_id": 1, "magnitude": 3, "image": "stimuli/aadac.png"},
+    {"imageid": 3, "stimulus_set_id": 1, "magnitude": 4, "image": "stimuli/aadad.png"},
+    {"imageid": 4, "stimulus_set_id": 1, "magnitude": 5, "image": "stimuli/aadae.png"},
+    {"imageid": 5, "stimulus_set_id": 2, "magnitude": 1, "image": "stimuli/aadaf.png"},
+    {"imageid": 6, "stimulus_set_id": 2, "magnitude": 2, "image": "stimuli/aadag.png"},
+    {"imageid": 7, "stimulus_set_id": 2, "magnitude": 3, "image": "stimuli/aadah.png"},
+    {"imageid": 8, "stimulus_set_id": 2, "magnitude": 4, "image": "stimuli/aadai.png"},
+    {"imageid": 9, "stimulus_set_id": 2, "magnitude": 5, "image": "stimuli/aadaj.png"},
+    {"imageid": 10, "stimulus_set_id": 3, "magnitude": 1, "image": "stimuli/aadak.png"},
+    {"imageid": 11, "stimulus_set_id": 3, "magnitude": 2, "image": "stimuli/aadal.png"},
+    {"imageid": 12, "stimulus_set_id": 3, "magnitude": 3, "image": "stimuli/aadam.png"},
+    {"imageid": 13, "stimulus_set_id": 3, "magnitude": 4, "image": "stimuli/aadan.png"},
+    {"imageid": 14, "stimulus_set_id": 3, "magnitude": 5, "image": "stimuli/aadao.png"},
+    {"imageid": 15, "stimulus_set_id": 4, "magnitude": 1, "image": "stimuli/aadap.png"},
+    {"imageid": 16, "stimulus_set_id": 4, "magnitude": 2, "image": "stimuli/aadaq.png"},
+    {"imageid": 17, "stimulus_set_id": 4, "magnitude": 3, "image": "stimuli/aadar.png"},
+    {"imageid": 18, "stimulus_set_id": 4, "magnitude": 4, "image": "stimuli/aadas.png"},
+    {"imageid": 19, "stimulus_set_id": 4, "magnitude": 5, "image": "stimuli/aadat.png"},
+    {"imageid": 20, "stimulus_set_id": 5, "magnitude": 1, "image": "stimuli/aadau.png"},
+    {"imageid": 21, "stimulus_set_id": 5, "magnitude": 2, "image": "stimuli/aadav.png"},
+    {"imageid": 22, "stimulus_set_id": 5, "magnitude": 3, "image": "stimuli/aadaw.png"},
+    {"imageid": 23, "stimulus_set_id": 5, "magnitude": 4, "image": "stimuli/aadax.png"},
+    {"imageid": 24, "stimulus_set_id": 5, "magnitude": 5, "image": "stimuli/aaday.png"}
+  ],
+  "distribution_cues": [
+    {
+      "id": "a",
+      "image": "stimuli/aafaa.png",
+      "magnitude_values": [1, 2, 3, 4, 5],
+      "probabilities": [0.3333333333, 0.2666666667, 0.2, 0.1333333333, 0.0666666667]
+    },
+    {
+      "id": "b",
+      "image": "stimuli/aafab.png",
+      "magnitude_values": [1, 2, 3, 4, 5],
+      "probabilities": [0.0666666667, 0.1333333333, 0.2, 0.2666666667, 0.3333333333]
+    }
+  ]
+}

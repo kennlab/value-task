@@ -369,6 +369,36 @@
       min-height: 460px;
     }
 
+    .distribution-section {
+      margin-top: 18px;
+      padding-top: 18px;
+      border-top: 1px solid var(--line);
+    }
+
+    .subsection-header {
+      display: flex;
+      align-items: end;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 10px;
+    }
+
+    .subsection-header h3 {
+      margin: 0;
+      font-size: 16px;
+    }
+
+    .subsection-header p {
+      margin: 4px 0 0;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    #distribution-heatmap {
+      width: 100%;
+      min-height: 390px;
+    }
+
     .pair-legend {
       border-left: 1px solid var(--line);
       padding-left: 14px;
@@ -498,6 +528,11 @@
         grid-template-columns: 1fr;
       }
 
+      .subsection-header {
+        align-items: stretch;
+        flex-direction: column;
+      }
+
       .pair-legend {
         border-left: 0;
         border-top: 1px solid var(--line);
@@ -595,7 +630,7 @@
 
       <div class="stats-grid">
         {{ stat_tile('Records', 'stat-records', 'filtered') }}
-        {{ stat_tile('Completed Choices', 'stat-choice', 'correct + incorrect') }}
+        {{ stat_tile('Completed Choices', 'stat-choice', 'non-timeout') }}
         {{ stat_tile('Accuracy', 'stat-accuracy', 'correct / scored') }}
         {{ stat_tile('Timeouts', 'stat-timeouts', 'choice trials') }}
       </div>
@@ -645,6 +680,22 @@
         </aside>
       </div>
 
+      <div class="distribution-section">
+        <div class="subsection-header">
+          <div>
+            <h3>Distribution Preference</h3>
+            <p id="distribution-readout">0 completed distribution choices</p>
+          </div>
+          <div class="field">
+            <label for="distribution-pair-filter">Position Pair</label>
+            <select id="distribution-pair-filter">
+              <option value="all">All position pairs</option>
+            </select>
+          </div>
+        </div>
+        <div id="distribution-heatmap"></div>
+      </div>
+
       <div class="table-wrap">
         <table id="summary-table">
           <thead>
@@ -672,7 +723,8 @@
       filteredTrials: [],
       pairMeta: new Map(),
       positionCloud: [],
-      stimulusSetChoices: new Set()
+      stimulusSetChoices: new Set(),
+      distributionPairChoice: 'all'
     };
 
     function setResponse(message) {
@@ -767,6 +819,7 @@
       const outcome = String(field(record, payload, 'outcome', '')).toLowerCase();
       const block = field(record, payload, 'block', 'N/A');
       const condition = field(record, payload, 'condition', 'N/A');
+      const sampledMagnitude = Number(field(record, payload, 'sampled_magnitude'));
       return {
         key,
         raw: record,
@@ -779,6 +832,11 @@
         outcome,
         magnitudes: asNumberArray(field(record, payload, 'magnitudes', [])),
         locations: asLocationPair(field(record, payload, 'locations', [])),
+        distributionOptions: asArray(field(record, payload, 'distribution_options', []))
+          .map(value => String(value)),
+        chosenDistribution: field(record, payload, 'chosen_distribution'),
+        sampledMagnitude: Number.isFinite(sampledMagnitude) ? sampledMagnitude : null,
+        trialKind: String(field(record, payload, 'trial_kind', '') || ''),
         timestamp: parseTimestamp(record, payload)
       };
     }
@@ -953,6 +1011,63 @@
       );
     }
 
+    function allChoiceTrials(trials) {
+      return trials.filter(trial =>
+        trial.magnitudes.length === 2 ||
+        trial.distributionOptions.length === 2
+      );
+    }
+
+    function completedDistributionChoiceTrials(trials) {
+      return trials.filter(trial =>
+        trial.distributionOptions.length === 2 &&
+        trial.locations.length === 2 &&
+        trial.chosenDistribution !== null &&
+        trial.chosenDistribution !== undefined &&
+        trial.outcome !== 'timeout'
+      );
+    }
+
+    function unorderedLocationPairKey(locations) {
+      return locations
+        .map(point => pointKey(point))
+        .sort()
+        .join('|');
+    }
+
+    function locationPairLabel(key) {
+      return key
+        .split('|')
+        .map(part => {
+          const point = part.split(',').map(Number);
+          return formatPoint(point);
+        })
+        .join(' / ');
+    }
+
+    function distributionPairKeysIn(trials) {
+      return Array.from(new Set(
+        completedDistributionChoiceTrials(trials)
+          .map(trial => unorderedLocationPairKey(trial.locations))
+      )).sort((a, b) => locationPairLabel(a).localeCompare(locationPairLabel(b)));
+    }
+
+    function selectedDistributionPairKey() {
+      return document.getElementById('distribution-pair-filter')?.value || 'all';
+    }
+
+    function syncDistributionPairFilter(trials) {
+      const select = document.getElementById('distribution-pair-filter');
+      const pairKeys = distributionPairKeysIn(trials);
+      const current = state.distributionPairChoice || select.value || 'all';
+      select.innerHTML = [
+        '<option value="all">All position pairs</option>',
+        ...pairKeys.map(key => `<option value="${escapeHtml(key)}">${escapeHtml(locationPairLabel(key))}</option>`)
+      ].join('');
+      select.value = pairKeys.includes(current) ? current : 'all';
+      state.distributionPairChoice = select.value;
+    }
+
     function updateCurrentTrial(trials) {
       const latest = trials[trials.length - 1];
       document.getElementById('trialid').textContent = latest?.trialid ?? 'N/A';
@@ -962,12 +1077,13 @@
     }
 
     function updateStats(filteredTrials) {
-      const choice = filteredTrials.filter(trial => trial.magnitudes.length === 2);
+      const choice = allChoiceTrials(filteredTrials);
+      const completedChoice = choice.filter(trial => trial.outcome !== 'timeout');
       const scored = scoredChoiceTrials(filteredTrials);
       const correct = scored.filter(trial => trial.outcome === 'correct').length;
       const timeouts = choice.filter(trial => trial.outcome === 'timeout').length;
       document.getElementById('stat-records').textContent = filteredTrials.length;
-      document.getElementById('stat-choice').textContent = scored.length;
+      document.getElementById('stat-choice').textContent = completedChoice.length;
       document.getElementById('stat-accuracy').textContent = formatPercent(correct / scored.length);
       document.getElementById('stat-timeouts').textContent = timeouts;
       document.getElementById('filter-readout').textContent = `${filteredTrials.length} of ${state.trials.length} records shown`;
@@ -1171,6 +1287,111 @@
       }).join('');
     }
 
+    function distributionCueIds(trials) {
+      const seen = new Set();
+      trials.forEach(trial => {
+        trial.distributionOptions.forEach(cueId => seen.add(String(cueId)));
+        if (trial.chosenDistribution !== null && trial.chosenDistribution !== undefined) {
+          seen.add(String(trial.chosenDistribution));
+        }
+      });
+      return Array.from(seen).sort();
+    }
+
+    function filteredDistributionChoiceTrials(filteredTrials) {
+      const pairKey = selectedDistributionPairKey();
+      let trials = completedDistributionChoiceTrials(filteredTrials);
+      if (pairKey !== 'all') {
+        trials = trials.filter(trial => unorderedLocationPairKey(trial.locations) === pairKey);
+      }
+      return trials;
+    }
+
+    function buildDistributionPreference(trials, cues) {
+      const counts = new Map();
+      trials.forEach(trial => {
+        const options = trial.distributionOptions.map(value => String(value));
+        const chosen = String(trial.chosenDistribution);
+        options.forEach(rowCue => {
+          const columnCue = options.find(option => option !== rowCue);
+          if (!columnCue) return;
+          const key = `${rowCue}|${columnCue}`;
+          if (!counts.has(key)) counts.set(key, { chosen: 0, total: 0 });
+          const bucket = counts.get(key);
+          bucket.total += 1;
+          if (chosen === rowCue) bucket.chosen += 1;
+        });
+      });
+
+      const z = cues.map(rowCue => cues.map(columnCue => {
+        if (rowCue === columnCue) return null;
+        const bucket = counts.get(`${rowCue}|${columnCue}`);
+        return bucket && bucket.total > 0 ? bucket.chosen / bucket.total : null;
+      }));
+      const customdata = cues.map(rowCue => cues.map(columnCue => {
+        const bucket = counts.get(`${rowCue}|${columnCue}`) || { chosen: 0, total: 0 };
+        return [rowCue, columnCue, bucket.chosen, bucket.total];
+      }));
+      return { z, customdata };
+    }
+
+    function updateDistributionHeatmap(filteredTrials) {
+      state.distributionPairChoice = selectedDistributionPairKey();
+      const distributionTrials = filteredDistributionChoiceTrials(filteredTrials);
+      const cues = distributionCueIds(distributionTrials);
+      document.getElementById('distribution-readout').textContent =
+        `${distributionTrials.length} completed distribution choices`;
+
+      const traces = [];
+      if (cues.length > 0) {
+        const preference = buildDistributionPreference(distributionTrials, cues);
+        traces.push({
+          type: 'heatmap',
+          x: cues,
+          y: cues,
+          z: preference.z,
+          customdata: preference.customdata,
+          zmin: 0,
+          zmax: 1,
+          colorscale: [
+            [0, '#2166ac'],
+            [0.5, '#f7f7f7'],
+            [1, '#b2182b']
+          ],
+          colorbar: { title: { text: 'P(row)' }, tickformat: '.0%' },
+          hoverongaps: false,
+          hovertemplate: '<b>%{customdata[0]} over %{customdata[1]}</b><br>Preference %{z:.0%}<br>%{customdata[2]} / %{customdata[3]} chose %{customdata[0]}<extra></extra>'
+        });
+      }
+
+      const layout = {
+        margin: { l: 58, r: 18, t: 18, b: 58 },
+        paper_bgcolor: '#ffffff',
+        plot_bgcolor: '#ffffff',
+        xaxis: {
+          title: { text: 'Alternative cue' },
+          side: 'bottom',
+          gridcolor: '#edf1f6'
+        },
+        yaxis: {
+          title: { text: 'Chosen cue' },
+          autorange: 'reversed',
+          gridcolor: '#edf1f6'
+        },
+        annotations: cues.length === 0 ? [{
+          text: 'No completed distribution choices in this window',
+          x: 0.5,
+          y: 0.5,
+          xref: 'paper',
+          yref: 'paper',
+          showarrow: false,
+          font: { color: '#657083', size: 14 }
+        }] : []
+      };
+
+      Plotly.react('distribution-heatmap', traces, layout, { responsive: true, displaylogo: false });
+    }
+
     function renderDashboard() {
       state.stimulusSetChoices = selectedStimulusSets();
       state.filteredTrials = applyFilter(state.trials);
@@ -1179,6 +1400,7 @@
       updateStats(state.filteredTrials);
       updateSummaryTable(state.filteredTrials);
       updatePlot(state.filteredTrials);
+      updateDistributionHeatmap(state.filteredTrials);
     }
 
     function fetchBehaviour() {
@@ -1188,6 +1410,7 @@
           state.rawData = data || {};
           state.trials = normalizeData(state.rawData);
           syncStimulusSetFilter(state.trials);
+          syncDistributionPairFilter(state.trials);
           renderDashboard();
         })
         .catch(error => {
@@ -1218,6 +1441,8 @@
       document.querySelectorAll('#stimulus-set-filter input').forEach(input => {
         input.checked = true;
       });
+      document.getElementById('distribution-pair-filter').value = 'all';
+      state.distributionPairChoice = 'all';
       renderDashboard();
     }
 
@@ -1231,6 +1456,7 @@
     document.getElementById('reset-filter').addEventListener('click', resetFilters);
     document.getElementById('filter-form').addEventListener('input', renderDashboard);
     document.getElementById('filter-form').addEventListener('change', renderDashboard);
+    document.getElementById('distribution-pair-filter').addEventListener('change', renderDashboard);
 
     socket.on('response', data => {
       if (data && data.message) setResponse(data.message);

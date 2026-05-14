@@ -1,5 +1,5 @@
-from typing import Dict, Any
-from itertools import product, combinations
+from typing import Any, Dict
+from itertools import combinations, permutations, product
 import json
 import os
 
@@ -15,24 +15,28 @@ BBOX_RATIO = 1.5
 STIMULUS_BBOX = {'width': STIMULUS_WIDTH * BBOX_RATIO, 'height': STIMULUS_HEIGHT * BBOX_RATIO}
 N_POSITIONS = 6
 RADIUS = 0.5
-ANGLES = np.arange(N_POSITIONS) * (360/N_POSITIONS) * np.pi/180
+ANGLES = np.arange(N_POSITIONS) * (360 / N_POSITIONS) * np.pi / 180
 x, y = RADIUS * np.cos(ANGLES), RADIUS * np.sin(ANGLES)
 STIMULUS_LOCATIONS = list(zip(x, y))
-LOCATIONS: Dict[int|str, tuple] = {
+LOCATIONS: Dict[int | str, tuple] = {
     'center': (0.0, 0.0),
 }
 for i, (x, y) in enumerate(STIMULUS_LOCATIONS):
     LOCATIONS[i] = (float(x), float(y))
+
 locations = range(N_POSITIONS)
-location_pairs = pd.read_csv('configs/locs.csv', index_col=0).loc[:, ['x','y']].values.tolist()
+location_pairs = pd.read_csv('configs/locs.csv', index_col=0).loc[0:5, ['x', 'y']].values.tolist()
 MAGNITUDES = tuple(range(1, 6))
 
 # Edit this to choose which stimulus sets can appear in a session.
-ENABLED_STIMULUS_SETS = (1, 2, 3, 4, 5)
-TRIALS_PER_STIMULUS_SET_BLOCK = 50
+# ENABLED_STIMULUS_SETS = (1, 2, 3, 4, 5)
+ENABLED_STIMULUS_SETS = (3,)
+MAGNITUDE_TRIALS_PER_STIMULUS_SET_BLOCK = 5
+DISTRIBUTION_TRIALS_PER_STIMULUS_SET_BLOCK = 10
+DISTRIBUTION_CUE_IDS = ('a', 'b')
 
 config: Dict[str, Any] = dict(
-    name='fleabottom',
+    name='fleabottom_distribution',
     coordinate_space='ndc',
     storage={'type': 'sqlite', 'path': 'data/data.db'},
     duration=10,
@@ -46,13 +50,13 @@ config: Dict[str, Any] = dict(
     display={
         'size': DISPLAY_SIZE,
         'display': 0,
-        'fullscreen': True
+        'fullscreen': True,
     },
     remote_server={
         'enabled': True,
         'show': False,
         'template_path': 'server',
-    }
+    },
 )
 config['io'] = {
     'reward': {
@@ -60,17 +64,16 @@ config['io'] = {
         'address': os.environ.get('PUMP', '/dev/ttyACM0'),
         'channels': [
             {'channel': '1', 'clockwise': True, 'speed': 100},
-            {'channel': '4', 'clockwise': True, 'speed': 100}
-        ]
+            {'channel': '4', 'clockwise': True, 'speed': 100},
+        ],
     }
 }
 
 magnitudes = MAGNITUDES
-reward_duration = 0.4  # in seconds
-interpulse_interval = 0.2  # in seconds
-config['reward_channels'] = ('1','4')
+reward_duration = 0.4
+config['reward_channels'] = ('1', '4')
 config['magnitude_mapping'] = {
-    mag: {'duration': reward_duration*mag, 'n_pulses': 1, 'interpulse_interval': 0}
+    mag: {'duration': reward_duration * mag, 'n_pulses': 1, 'interpulse_interval': 0}
     for mag in magnitudes
 }
 
@@ -89,11 +92,15 @@ DISTRIBUTION_CUES = {
     str(cue['id']): cue
     for cue in stimulus_data.get('distribution_cues', [])
 }
+
 if not ENABLED_STIMULUS_SETS:
     raise ValueError("ENABLED_STIMULUS_SETS must contain at least one stimulus set.")
 unknown_sets = set(ENABLED_STIMULUS_SETS) - set(STIMULUS_SETS)
 if unknown_sets:
     raise ValueError(f"Unknown stimulus sets requested: {sorted(unknown_sets)}")
+unknown_distribution_cues = set(DISTRIBUTION_CUE_IDS) - set(DISTRIBUTION_CUES)
+if unknown_distribution_cues:
+    raise ValueError(f"Unknown distribution cues requested: {sorted(unknown_distribution_cues)}")
 missing_magnitudes = {
     set_id: sorted(set(magnitudes) - set(STIMULUS_SETS[set_id]))
     for set_id in ENABLED_STIMULUS_SETS
@@ -103,82 +110,105 @@ if missing_magnitudes:
     raise ValueError(f"Stimulus sets are missing magnitudes: {missing_magnitudes}")
 
 config['stimulus_sets'] = STIMULUS_SETS
-config['distribution_cues'] = DISTRIBUTION_CUES
-# Fallback only; each generated condition below overrides items with its own
-# stimulus set so trials never mix images across sets.
+config['distribution_cues'] = {
+    cue_id: DISTRIBUTION_CUES[cue_id]
+    for cue_id in DISTRIBUTION_CUE_IDS
+}
 config['items'] = STIMULUS_SETS[ENABLED_STIMULUS_SETS[0]]
 
-forced_choice_trials = {
-    f'set{set_id}_forced_m{mag}_loc{loc}': dict(
-        stimulus_set=set_id,
-        items=STIMULUS_SETS[set_id],
-        magnitude=mag,
-        loc=loc,
-        trial_type='forced'
-    )
-    for set_id in ENABLED_STIMULUS_SETS
-    for mag, loc in product(magnitudes, locations)
-}
-
-two_afc_trials = {
+magnitude_choice_trials = {
     f'set{set_id}_choice_m{option1}v{option2}_loc{locs[0]}v{locs[1]}': dict(
         stimulus_set=set_id,
         items=STIMULUS_SETS[set_id],
         magnitudes=(option1, option2),
         locs=locs,
-        trial_type='choice'
+        trial_type='choice',
     )
     for set_id in ENABLED_STIMULUS_SETS
     for (option1, option2), locs in product(combinations(magnitudes, 2), location_pairs)
 }
 
-config['conditions'] = {**forced_choice_trials, **two_afc_trials}
+distribution_choice_trials = {
+    f'set{set_id}_dist_{dist1}v{dist2}_loc{locs[0]}v{locs[1]}': dict(
+        stimulus_set=set_id,
+        items=STIMULUS_SETS[set_id],
+        distribution_options=(dist1, dist2),
+        locs=locs,
+        trial_type='distribution_choice',
+    )
+    for set_id in ENABLED_STIMULUS_SETS
+    for (dist1, dist2), locs in product(permutations(DISTRIBUTION_CUE_IDS, 2), location_pairs)
+}
 
-# Random 50-trial blocks by stimulus set. Each block includes all magnitude
-# combinations and all opposite-position pairings for that stimulus set.
-stimulus_set_block_names = {
-    set_id: f'stimulus_set_{set_id}'
+config['conditions'] = {**magnitude_choice_trials, **distribution_choice_trials}
+
+magnitude_block_names = {
+    set_id: f'stimulus_set_{set_id}_magnitude'
     for set_id in ENABLED_STIMULUS_SETS
 }
+distribution_block_names = {
+    set_id: f'stimulus_set_{set_id}_distribution'
+    for set_id in ENABLED_STIMULUS_SETS
+}
+
 blocks = {}
 for set_id in ENABLED_STIMULUS_SETS:
-    current_block = stimulus_set_block_names[set_id]
-    next_from = list(set(stimulus_set_block_names.values()) - {current_block})
-    blocks[current_block] = dict(
+    magnitude_block = magnitude_block_names[set_id]
+    distribution_block = distribution_block_names[set_id]
+    next_magnitude_blocks = [
+        block_name
+        for next_set_id, block_name in magnitude_block_names.items()
+        if next_set_id != set_id
+    ] or [magnitude_block]
+
+    blocks[magnitude_block] = dict(
         stimulus_set=set_id,
         conditions=[
             condition_name
-            for condition_name, condition in two_afc_trials.items()
+            for condition_name, condition in magnitude_choice_trials.items()
             if condition['stimulus_set'] == set_id
         ],
-        length=TRIALS_PER_STIMULUS_SET_BLOCK,
+        length=MAGNITUDE_TRIALS_PER_STIMULUS_SET_BLOCK,
         retry={'timeout': True},
-        transition=[{'next_from': next_from}],
-        method='random'
+        transition=[{'next': distribution_block}],
+        method='random',
+    )
+    blocks[distribution_block] = dict(
+        stimulus_set=set_id,
+        conditions=[
+            condition_name
+            for condition_name, condition in distribution_choice_trials.items()
+            if condition['stimulus_set'] == set_id
+        ],
+        length=DISTRIBUTION_TRIALS_PER_STIMULUS_SET_BLOCK,
+        retry={'timeout': True},
+        transition=[{'next_from': next_magnitude_blocks}],
+        method='random',
     )
 
 config['blocks'] = blocks
 
 config['trial_types'] = {
-    'forced': {
-        'module': 'trials/forced.py',
-        'class': 'ForcedChoiceTrial'
-    },
     'choice': {
         'module': 'trials/twoafc.py',
-        'class': 'TwoAFCTrial'
-    }
+        'class': 'TwoAFCTrial',
+    },
+    'distribution_choice': {
+        'module': 'trials/distribution_twoafc.py',
+        'class': 'DistributionTwoAFCTrial',
+    },
 }
 config['hotkeys'] = {
-    '4': {'do':'pump_on'},
+    '4': {'do': 'pump_on'},
     '8': {'do': 'pump_off'},
     '3': {'do': 'pause'},
     '7': {'do': 'unpause'},
-    '5': {'do': 'quit'}
+    '5': {'do': 'quit'},
 }
 config['valid_times'] = [
-    {'start': '08:00', 'end': '18:00'}
+    {'start': '08:00', 'end': '18:00'},
 ]
+
 if __name__ == '__main__':
     import pprint
     pprint.pprint(config)
