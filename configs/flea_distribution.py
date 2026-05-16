@@ -31,9 +31,9 @@ MAGNITUDES = tuple(range(1, 6))
 # Edit this to choose which stimulus sets can appear in a session.
 # ENABLED_STIMULUS_SETS = (1, 2, 3, 4, 5)
 ENABLED_STIMULUS_SETS = (3,)
-MAGNITUDE_TRIALS_PER_STIMULUS_SET_BLOCK = 5
+MAGNITUDE_TRIALS_PER_STIMULUS_SET_BLOCK = 2
 DISTRIBUTION_TRIALS_PER_STIMULUS_SET_BLOCK = 10
-DISTRIBUTION_CUE_IDS = ('a', 'b')
+DISTRIBUTION_CUE_IDS = ('a', 'b', 'c')
 
 config: Dict[str, Any] = dict(
     name='fleabottom_distribution',
