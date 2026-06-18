@@ -5,6 +5,8 @@ import os
 
 import numpy as np
 import pandas as pd
+from dotenv import load_dotenv
+load_dotenv()
 
 DISPLAY_SIZE = (1080, 1920)
 ASPECT_RATIO = DISPLAY_SIZE[0] / DISPLAY_SIZE[1]
@@ -31,9 +33,9 @@ MAGNITUDES = tuple(range(1, 6))
 # Edit this to choose which stimulus sets can appear in a session.
 # ENABLED_STIMULUS_SETS = (1, 2, 3, 4, 5)
 ENABLED_STIMULUS_SETS = (3,)
-MAGNITUDE_TRIALS_PER_STIMULUS_SET_BLOCK = 2
+MAGNITUDE_TRIALS_PER_STIMULUS_SET_BLOCK = 1
 DISTRIBUTION_TRIALS_PER_STIMULUS_SET_BLOCK = 10
-DISTRIBUTION_CUE_IDS = ('a', 'b', 'c')
+DISTRIBUTION_CUE_IDS = ('a', 'b', 'c', 'd')
 
 config: Dict[str, Any] = dict(
     name='fleabottom_distribution',
@@ -49,12 +51,12 @@ config: Dict[str, Any] = dict(
     locations=LOCATIONS,
     display={
         'size': DISPLAY_SIZE,
-        'display': 0,
+        'display': 1,
         'fullscreen': True,
     },
     remote_server={
         'enabled': True,
-        'show': False,
+        'show': os.getenv('SHOW_REMOTE', 'FALSE').lower() == 'true',
         'template_path': 'server',
     },
 )
