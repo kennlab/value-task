@@ -19,4 +19,5 @@ experiment = { git = "https://github.com/jselvan/experiment" }
 [dependency-groups]
 dev = [
     "pytest>=9.0.3",
+    "seaborn>=0.13.2",
 ]
