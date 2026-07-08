@@ -35,7 +35,7 @@ MAGNITUDES = tuple(range(1, 6))
 ENABLED_STIMULUS_SETS = (3,)
 MAGNITUDE_TRIALS_PER_STIMULUS_SET_BLOCK = 1
 DISTRIBUTION_TRIALS_PER_STIMULUS_SET_BLOCK = 10
-DISTRIBUTION_CUE_IDS = ('a', 'b', 'c', 'd')
+DISTRIBUTION_CUE_IDS = ('b', 'd', 'e', 'f')
 
 config: Dict[str, Any] = dict(
     name='fleabottom_distribution',
