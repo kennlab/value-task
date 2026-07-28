@@ -37,7 +37,7 @@ DISTRIBUTION_TRIALS_PER_STIMULUS_SET_BLOCK = 0
 DISTRIBUTION_CUE_IDS = ('a', 'b')
 
 config: Dict[str, Any] = dict(
-    name='gemini',
+    name='gilbert',
     coordinate_space='ndc',
     storage={'type': 'sqlite', 'path': 'data/data.db'},
     duration=10,
