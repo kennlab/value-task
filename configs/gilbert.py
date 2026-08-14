@@ -5,8 +5,6 @@ import os
 
 import numpy as np
 import pandas as pd
-from dotenv import load_dotenv
-load_dotenv()
 
 DISPLAY_SIZE = (1080, 1920)
 ASPECT_RATIO = DISPLAY_SIZE[0] / DISPLAY_SIZE[1]
@@ -32,13 +30,14 @@ MAGNITUDES = tuple(range(1, 6))
 
 # Edit this to choose which stimulus sets can appear in a session.
 # ENABLED_STIMULUS_SETS = (1, 2, 3, 4, 5)
-ENABLED_STIMULUS_SETS = (3,)
-MAGNITUDE_TRIALS_PER_STIMULUS_SET_BLOCK = 1
-DISTRIBUTION_TRIALS_PER_STIMULUS_SET_BLOCK = 10
-DISTRIBUTION_CUE_IDS = ('b', 'd', 'e', 'f')
+ENABLED_STIMULUS_SETS = (1,)
+MAGNITUDE_TRIALS_PER_STIMULUS_SET_BLOCK = 10
+MAGNITUDE_TRIALS_PER_VALUE_DIFF_BLOCK = 10
+DISTRIBUTION_TRIALS_PER_STIMULUS_SET_BLOCK = 0 
+DISTRIBUTION_CUE_IDS = ('a', 'b')
 
 config: Dict[str, Any] = dict(
-    name='fleabottom_distribution',
+    name='gilbert',
     coordinate_space='ndc',
     storage={'type': 'sqlite', 'path': 'data/data.db'},
     duration=10,
@@ -51,12 +50,12 @@ config: Dict[str, Any] = dict(
     locations=LOCATIONS,
     display={
         'size': DISPLAY_SIZE,
-        'display': 1,
+        'display': 0,
         'fullscreen': True,
     },
     remote_server={
         'enabled': True,
-        'show': os.getenv('SHOW_REMOTE', 'FALSE').lower() == 'true',
+        'show': False,
         'template_path': 'server',
     },
 )
@@ -65,15 +64,15 @@ config['io'] = {
         'type': 'ISMATEC_SERIAL',
         'address': os.environ.get('PUMP', '/dev/ttyACM0'),
         'channels': [
-            {'channel': '1', 'clockwise': True, 'speed': 100},
+            {'channel': '3', 'clockwise': True, 'speed': 100},
             {'channel': '4', 'clockwise': True, 'speed': 100},
         ],
     }
 }
 
 magnitudes = MAGNITUDES
-reward_duration = 0.4
-config['reward_channels'] = ('1', '4')
+reward_duration = 1 
+config['reward_channels'] = ('3', '4')
 config['magnitude_mapping'] = {
     mag: {'duration': reward_duration * mag, 'n_pulses': 1, 'interpulse_interval': 0}
     for mag in magnitudes
@@ -153,7 +152,41 @@ distribution_block_names = {
     for set_id in ENABLED_STIMULUS_SETS
 }
 
+
 blocks = {}
+
+# value diff blocks by stimulus set
+def value_diff_pair_equals(magnitudes, value_diff):
+    a, b = magnitudes
+    return abs(a-b)==value_diff
+for set_id in ENABLED_STIMULUS_SETS:
+    all_interleaved = f'stimulus_set_{set_id}_magnitude' 
+    for value_diff in range(4, 0, -1):
+        conditions = [
+            condition
+            for condition, info in magnitude_choice_trials.items()
+            if value_diff_pair_equals(info['magnitudes'], value_diff) and info['stimulus_set'] == set_id
+        ]
+        next_block_value_diff = value_diff - 1 if value_diff > 1 else value_diff 
+        previous_block_value_diff = value_diff + 1 if value_diff < 4 else value_diff
+        current_block = f'stimulus_set_{set_id}_valuediff{value_diff}' 
+        previous_block = f'stimulus_set_{set_id}_valuediff{previous_block_value_diff}' 
+        next_block = f'stimulus_set_{set_id}_valuediff{next_block_value_diff}' 
+        blocks[current_block] = dict(
+            stimulus_set=set_id,
+            conditions=conditions,
+            length=MAGNITUDE_TRIALS_PER_VALUE_DIFF_BLOCK,
+            retry={'timeout': True},
+            transition=[
+                {'condition': {'outcome': 'correct', 'min': 10}, 'next': next_block if value_diff > 1 else all_interleaved}, 
+                {'condition': {'outcome': 'correct', 'min': 8}, 'next': next_block},
+                {'condition': {'outcome': 'correct', 'min': 6}, 'next': current_block},
+                {'next': previous_block}
+            ],
+            method='random'
+        )
+
+
 for set_id in ENABLED_STIMULUS_SETS:
     magnitude_block = magnitude_block_names[set_id]
     distribution_block = distribution_block_names[set_id]

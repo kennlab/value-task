@@ -50,13 +50,15 @@ def get_chose_left(x):
     loc1, loc2 = x['locations']
     return (loc1[0] < loc2[1]) == (x['chosen'] == 'option1')
 
-def get_data():
-    conn = sqlite3.connect(r"C:\Users\akeeler\data.db")
+def get_data(path, subject=None):
+    conn = sqlite3.connect(path)
     query = """
     SELECT * 
     FROM data 
     WHERE outcome in ("correct", "incorrect")
     """
+    if subject is not None:
+        query += f"AND subjectid = '{subject}'"
     data = pd.read_sql(query, conn)
     data['datetime']=pd.to_datetime(data['date'] + ' ' + data['time'])
     condition_split = data['condition'].str.split('_')
@@ -70,6 +72,8 @@ def get_data():
     data['value_left_minus_right'] = data['data'].apply(get_value_difference)
     data['chose_left'] = data['data'].apply(get_chose_left)
     return data
+
+
 
 def plot_choice_probability(data, period="4D"):
     # Create 2-day bins
@@ -149,9 +153,11 @@ def plot_heatmaps(data, period="2D"):
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description="Analyze TwoAFC behavior data")
+    parser.add_argument("path")
     parser.add_argument("--period", type=str, default="2D", help="Time period for binning (e.g., '2D' for 2 days)")
+    parser.add_argument("--subject", type=str, default=None, help="subjectid")
     args = parser.parse_args()
-    data = get_data()
+    data = get_data(args.path, args.subject)
     plot_choice_probability(data, period=args.period)
     plt.show()
     plot_heatmaps(data, period=args.period)
