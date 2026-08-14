@@ -17,6 +17,9 @@ dependencies = [
 experiment = { git = "https://github.com/jselvan/experiment" }
 
 [dependency-groups]
+analysis = [
+    "statsmodels>=0.14.6",
+]
 dev = [
     "pytest>=9.0.3",
     "seaborn>=0.13.2",

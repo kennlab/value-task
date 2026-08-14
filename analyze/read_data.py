@@ -339,6 +339,28 @@ def plot_choice_heatmaps_by_bin(
     fig.subplots_adjust(bottom=0.04, left=0.08, right=0.98, top=0.96)
     return fig, axes, legend_ax
 
+def plot_choice_heatmap(data, dist_to_image, order=None, ax=None, cmap="coolwarm"):
+    mat = build_choice_matrix(data)
+    if order is not None:
+        mat = mat.reindex(index=order, columns=order)
+    else:
+        order= mat.index
+    if ax is None:
+        ax=plt.gca()
+
+    sns.heatmap(
+        mat,
+        ax=ax,
+        annot=True,
+        fmt=".2f",
+        cmap=cmap,
+        vmin=0,
+        vmax=1,
+        cbar=False,
+        square=True,
+    )
+
+    _decorate_heatmap_axes_with_images(ax, order, dist_to_image)
 
 # ----------------------------
 # Plot 2: actual vs experienced distributions
@@ -459,8 +481,48 @@ def plot_actual_vs_experienced_distributions(
 # ----------------------------
 # Example usage
 # ----------------------------
+def load_data_from_db(db_path="merged.db"):
+    conn = sqlite3.connect(db_path)
+    df = pd.read_sql_query("SELECT * FROM data", conn)
+    config = get_latest_config(conn)
+    conn.close()
+ 
+    magnitude_data = []
+    distribution_data = []
+
+    for block, blockdata in df.groupby("block"):
+        assert isinstance(block, str), f"Expected block to be a string, got {type(block)}"
+        if block.endswith("magnitude"):
+            magnitude_data.append(blockdata)
+        else:
+            distribution_data.append(blockdata)
+
+    magnitude_data = pd.concat(magnitude_data, ignore_index=True)
+    distribution_data = pd.concat(distribution_data, ignore_index=True)
+
+    distribution_data = distribution_data.query('outcome == "choice"').copy()
+    distribution_data = distribution_data.join(
+        pd.DataFrame(distribution_data.data.apply(json.loads).tolist(), index=distribution_data.index)
+    )
+
+    assert config is not None, "No configuration found in the database."
+
+    actual_distribution_table = build_actual_distribution_table(config)
+    distribution_summary = summarize_distributions(actual_distribution_table)
+
+
+    choice_df = prepare_choice_data(distribution_data, time_col="date")
+    experienced_distribution_table = build_experienced_distribution_table(
+        choice_df,
+        id_col="chosen_distribution",
+        sampled_col="sampled_magnitude",
+    )
+
+    return choice_df, magnitude_data, actual_distribution_table, experienced_distribution_table, distribution_summary
+
+   
 def main():
-    conn = sqlite3.connect("data.db")
+    conn = sqlite3.connect("merged.db")
     df = pd.read_sql_query("SELECT * FROM data", conn)
 
     magnitude_data = []
@@ -493,19 +555,19 @@ def main():
         choice_df,
         time_col="date",
         bin_edges=[
+            "2026-05-12",
+            "2026-05-13",
             "2026-05-19",
-            "2026-05-29",
             "2026-06-04",
-            "2026-06-08",
             "2026-06-10",
-            "2026-06-15",
+            "2026-06-30",
         ],
         bin_labels=[
-            "May 19 to May 28",
-            "May 29 to Jun 3",
-            "Jun 4 to Jun 7",
-            "Jun 8 to Jun 9",
-            "Jun 10 to Jun 15",
+            "May 12",
+            "May 13 to May 18",
+            "May 19 to Jun 3",
+            "Jun 4 to Jun 9",
+            "Jun 10 to now",
         ],
         right=True,
     )
