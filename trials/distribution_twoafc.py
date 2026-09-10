@@ -57,6 +57,10 @@ class DistributionTwoAFCTrial(TwoAFCTrial):
 
     @classmethod
     def from_config(cls, config: dict) -> 'DistributionTwoAFCTrial':
+        return cls(**cls._config_kwargs(config))
+
+    @classmethod
+    def _config_kwargs(cls, config: dict) -> dict:
         distribution_options = tuple(str(cue_id) for cue_id in config['distribution_options'])
         distribution_cues = config['distribution_cues']
         stimulus_set = config.get('stimulus_set')
@@ -71,7 +75,7 @@ class DistributionTwoAFCTrial(TwoAFCTrial):
         reward_channels = tuple(config.get('reward_channels', (1, 2)))
         center = tuple(config['locations'].get('center', cls.CENTER))
         coordinate_space = config.get('coordinate_space', 'ndc')
-        return cls(
+        return dict(
             distribution_options=distribution_options,
             distribution_cues=distribution_cues,
             magnitude_items=magnitude_items,
@@ -109,7 +113,7 @@ class DistributionTwoAFCTrial(TwoAFCTrial):
     def reward_params_for_choices(self):
         return None
 
-    def trial_data(self, reward_params) -> dict[str, Any]:
+    def trial_data(self) -> dict[str, Any]:
         return {
             "trial_kind": "distribution_choice",
             "distribution_options": self.distribution_options,
@@ -132,7 +136,7 @@ class DistributionTwoAFCTrial(TwoAFCTrial):
         probabilities = [float(probability) for probability in cue['probabilities']]
         return random.choices(magnitude_values, weights=probabilities, k=1)[0]
 
-    def result_for_choice(self, chosen: str, data: dict[str, Any], reward_params) -> TrialResult:
+    def result_for_choice(self, chosen: str, data: dict[str, Any]) -> TrialResult:
         chosen_index = self.CHOICE_NAMES.index(chosen)
         chosen_distribution = self.distribution_options[chosen_index]
         sampled_magnitude = self.sample_magnitude(chosen_distribution)
@@ -182,8 +186,7 @@ class DistributionTwoAFCTrial(TwoAFCTrial):
         mgr,
         result: TrialResult,
         chosen: str | None,
-        data: dict[str, Any],
-        reward_params,
+        data: dict[str, Any]
     ) -> Scene:
         if result.outcome == 'timeout':
             return Scene(

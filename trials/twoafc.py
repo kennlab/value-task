@@ -98,13 +98,12 @@ class TwoAFCTrial(Trial):
     def reward_params_for_choices(self) -> list[dict[str, Any]]:
         return [self.magnitude_mapping[mag] for mag in self.magnitudes]
 
-    def trial_data(self, reward_params) -> dict[str, Any]:
+    def trial_data(self) -> dict[str, Any]:
         return {
             "trial_kind": "magnitude_choice",
             "options": self.options,
             "magnitudes": self.magnitudes,
             "locations": self.locs,
-            "reward_params": reward_params,
             "stimulus_set": self.stimulus_set,
         }
 
@@ -131,7 +130,7 @@ class TwoAFCTrial(Trial):
     def correct_choice(self) -> str:
         return 'option1' if self.magnitudes[0] > self.magnitudes[1] else 'option2'
 
-    def result_for_choice(self, chosen: str, data: dict[str, Any], reward_params) -> TrialResult:
+    def result_for_choice(self, chosen: str, data: dict[str, Any]) -> TrialResult:
         outcome = 'correct' if chosen == self.correct_choice() else 'incorrect'
         data['chosen'] = chosen
         return TrialResult(
@@ -189,9 +188,9 @@ class TwoAFCTrial(Trial):
         mgr,
         result: TrialResult,
         chosen: str | None,
-        data: dict[str, Any],
-        reward_params,
+        data: dict[str, Any]
     ) -> Scene:
+        reward_params = self.reward_params_for_choices()
         if result.outcome == 'timeout':
             return Scene(
                 mgr,
@@ -213,8 +212,7 @@ class TwoAFCTrial(Trial):
         )
 
     def run(self, mgr) -> TrialResult:
-        reward_params = self.reward_params_for_choices()
-        data = self.trial_data(reward_params)
+        data = self.trial_data()
         scene, tc = self.get_choice_scene(mgr)
 
         scene.run()
@@ -227,15 +225,14 @@ class TwoAFCTrial(Trial):
             )
 
         if tc.chosen in self.CHOICE_NAMES:
-            res = self.result_for_choice(tc.chosen, data, reward_params)
+            res = self.result_for_choice(tc.chosen, data)
         else:
             res = self.timeout_result(data)
 
-        outcome_scene = self.outcome_scene_for_result(mgr, res, tc.chosen, data, reward_params)
+        outcome_scene = self.outcome_scene_for_result(mgr, res, tc.chosen, data)
         outcome_scene.run()
         if outcome_scene.quit:
             res.continue_session = False
 
-        print(data)
         mgr.record(**data, outcome=res.outcome)
         return res
