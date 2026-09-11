@@ -65,6 +65,13 @@ class TwoAFCTrial(Trial):
         self.coordinate_space = coordinate_space
         self.stimulus_set = stimulus_set
 
+    @staticmethod
+    def parse_magnitude_level(magnitude):
+        if magnitude == 'jackpot':
+            return magnitude
+        else:
+            return int(magnitude)
+
     @classmethod
     def from_config(cls, config: dict) -> 'TwoAFCTrial':
         magnitudes = tuple(config['magnitudes'])

@@ -32,7 +32,7 @@ class DistributionTwoAFCTrial(TwoAFCTrial):
             for cue_id, cue in distribution_cues.items()
         }
         self.magnitude_items = {
-            int(magnitude) if magnitude != "jackpot" else "jackpot": image
+            self.parse_magnitude_level(magnitude): image
             for magnitude, image in magnitude_items.items()
         }
         self._validate_distribution_options()
@@ -159,7 +159,7 @@ class DistributionTwoAFCTrial(TwoAFCTrial):
         )
 
     def get_reward_scene(self, mgr, reward_params, magnitude_level, background) -> Scene:
-        sampled_image = self.magnitude_items[int(magnitude_level) if magnitude_level!="jackpot" else "jackpot"]
+        sampled_image = self.magnitude_items[self.parse_magnitude_level(magnitude_level)]
         rew = RewardAdapter.from_manager(
             manager=mgr,
             channels=self.reward_channels,
