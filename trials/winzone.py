@@ -31,9 +31,13 @@ class WinZoneTrial(DistributionTwoAFCTrial):
         center=TwoAFCTrial.CENTER,
         coordinate_space: str = 'ndc',
         stimulus_set: int | None = None,
+        jackpot_pre_delay_duration: float = .2
     ):
         self.winzone = winzone
         self.winzone_method = winzone_method
+        if winzone_method == WinZoneMethod.DETERMINISTIC:
+            raise NotImplementedError("Only WinZoneMethod random is currently implemented")
+        self.jackpot_pre_delay_duration = jackpot_pre_delay_duration
         super().__init__(
             distribution_options=distribution_options,
             distribution_cues=distribution_cues,
@@ -48,11 +52,14 @@ class WinZoneTrial(DistributionTwoAFCTrial):
             coordinate_space=coordinate_space,
             stimulus_set=stimulus_set
         )
+        if 'jackpot' not in self.magnitude_mapping or 'jackpot' not in self.magnitude_items:
+            raise ValueError("Stimulus set and mapping must specify a jackpot level")
     @classmethod
     def from_config(cls, config: dict) -> 'WinZoneTrial':
         return cls(
             winzone=config['winzone'],
             winzone_method=WinZoneMethod(config['winzone_method']),
+            jackpot_pre_delay_duration=config['jackpot_pre_delay_duration'],
             **super()._config_kwargs(config)
         )
     def trial_data(self) -> dict[str, Any]:
@@ -79,6 +86,7 @@ class WinZoneTrial(DistributionTwoAFCTrial):
         data = self.trial_data()
         winzone_scene, winzone_tc = self.get_winzone_scene(mgr)
         scene, tc = self.get_choice_scene(mgr)
+        jackpot_pre_delay = Scene(mgr, TimeCounter(self.jackpot_pre_delay_duration))
         jackpot = self.get_reward_scene(
             mgr,
             self.magnitude_mapping["jackpot"],
@@ -128,6 +136,10 @@ class WinZoneTrial(DistributionTwoAFCTrial):
             deliver_jackpot = data.get('sampled_magnitude') == self.winzone
             mgr.record(jackpot_delivered=deliver_jackpot)
             if deliver_jackpot:
+                jackpot_pre_delay.run()
+                if jackpot_pre_delay.quit:
+                    res.continue_session = False
+                    return res
                 jackpot.run()
                 if jackpot.quit:
                     res.continue_session = False

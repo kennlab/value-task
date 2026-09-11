@@ -49,6 +49,7 @@ config: Dict[str, Any] = dict(
     cue_incorrect=True,
     reward_feedback_method='bar_height',
     locations=LOCATIONS,
+    jackpot_pre_delay_duration=.2,
     display={
         'size': DISPLAY_SIZE,
         'display': 1,
