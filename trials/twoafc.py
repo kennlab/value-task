@@ -13,6 +13,7 @@ HIDDEN_PROGRESS_SIZE = (0.001, 0.001)
 
 
 class TwoAFCTrial(Trial):
+    TRIAL_KIND = "magnitude_choice"
     CHOICE_NAMES = ('option1', 'option2')
     DEFAULT_MAGNITUDE_MAPPING = {
         1: {'duration': 1},
@@ -100,7 +101,7 @@ class TwoAFCTrial(Trial):
 
     def trial_data(self) -> dict[str, Any]:
         return {
-            "trial_kind": "magnitude_choice",
+            "trial_kind": self.TRIAL_KIND,
             "options": self.options,
             "magnitudes": self.magnitudes,
             "locations": self.locs,

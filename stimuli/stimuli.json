@@ -15,6 +15,7 @@
     {"imageid": 12, "stimulus_set_id": 3, "magnitude": 3, "image": "stimuli/aadam.png"},
     {"imageid": 13, "stimulus_set_id": 3, "magnitude": 4, "image": "stimuli/aadan.png"},
     {"imageid": 14, "stimulus_set_id": 3, "magnitude": 5, "image": "stimuli/aadao.png"},
+    {"imageid": 14, "stimulus_set_id": 3, "magnitude": "jackpot", "image": "stimuli/aafhg.png"},
     {"imageid": 15, "stimulus_set_id": 4, "magnitude": 1, "image": "stimuli/aadap.png"},
     {"imageid": 16, "stimulus_set_id": 4, "magnitude": 2, "image": "stimuli/aadaq.png"},
     {"imageid": 17, "stimulus_set_id": 4, "magnitude": 3, "image": "stimuli/aadar.png"},
@@ -92,6 +93,18 @@
       "image": "stimuli/aafet.png",
       "magnitude_values": [1, 2, 3, 4, 5],
       "probabilities": [0,0,0,0,1]
+    },
+    {
+      "id": "g",
+      "image": "stimuli/aafag.png",
+      "magnitude_values": [1, 2, 3, 4, 5],
+      "probabilities": [0,0.2,0,0.8,0]
+    },
+    {
+      "id": "h",
+      "image": "stimuli/aafah.png",
+      "magnitude_values": [1, 2, 3, 4, 5],
+      "probabilities": [0,0.8,0,0.2,0]
     }
   ]
 }

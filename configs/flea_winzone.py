@@ -35,10 +35,10 @@ MAGNITUDES = tuple(range(1, 6))
 ENABLED_STIMULUS_SETS = (3,)
 MAGNITUDE_TRIALS_PER_STIMULUS_SET_BLOCK = 1
 DISTRIBUTION_TRIALS_PER_STIMULUS_SET_BLOCK = 10
-DISTRIBUTION_CUE_IDS = ('a', 'b', 'c')
+DISTRIBUTION_CUE_IDS = ('a', 'b', 'd', 'e', 'f', '2', '4')
 
 config: Dict[str, Any] = dict(
-    name='gilbert',
+    name='fleabottom_distribution',
     coordinate_space='ndc',
     storage={'type': 'sqlite', 'path': 'data/data.db'},
     duration=10,
@@ -78,6 +78,7 @@ config['magnitude_mapping'] = {
     mag: {'duration': reward_duration * mag, 'n_pulses': 1, 'interpulse_interval': 0}
     for mag in magnitudes
 }
+config['magnitude_mapping']['jackpot'] = {'duration': 2, 'n_pulses': 1, 'interpulse_interval': 0}
 
 with open('stimuli/stimuli.json') as f:
     stimulus_data = json.load(f)
@@ -89,7 +90,7 @@ STIMULUS_SETS = {
     }
 }
 for cue in stimulus_data['magnitude_cues']:
-    STIMULUS_SETS[int(cue['stimulus_set_id'])][int(cue['magnitude'])] = cue['image']
+    STIMULUS_SETS[int(cue['stimulus_set_id'])][int(cue['magnitude']) if cue['magnitude'] != 'jackpot' else "jackpot"] = cue['image']
 DISTRIBUTION_CUES = {
     str(cue['id']): cue
     for cue in stimulus_data.get('distribution_cues', [])
@@ -142,7 +143,22 @@ distribution_choice_trials = {
     for (dist1, dist2), locs in product(permutations(DISTRIBUTION_CUE_IDS, 2), location_pairs)
 }
 
-config['conditions'] = {**magnitude_choice_trials, **distribution_choice_trials}
+winzone_trials = {
+    f'set{set_id}_dist_{dist1}v{dist2}_loc{locs[0]}v{locs[1]}_winzone{winzone}': dict(
+        winzone=winzone,
+        winzone_method='random',
+        stimulus_set=set_id,
+        items=STIMULUS_SETS[set_id],
+        distribution_options=(dist1, dist2),
+        locs=locs,
+        trial_type='winzone',
+    )
+    for set_id in ENABLED_STIMULUS_SETS
+    for (dist1, dist2), locs in product(permutations(DISTRIBUTION_CUE_IDS, 2), location_pairs)
+    for winzone in MAGNITUDES
+}
+
+config['conditions'] = {**magnitude_choice_trials, **distribution_choice_trials, **winzone_trials}
 
 magnitude_block_names = {
     set_id: f'stimulus_set_{set_id}_magnitude'
@@ -154,39 +170,78 @@ distribution_block_names = {
 }
 
 blocks = {}
-for set_id in ENABLED_STIMULUS_SETS:
-    magnitude_block = magnitude_block_names[set_id]
-    distribution_block = distribution_block_names[set_id]
-    next_magnitude_blocks = [
-        block_name
-        for next_set_id, block_name in magnitude_block_names.items()
-        if next_set_id != set_id
-    ] or [magnitude_block]
+# for set_id in ENABLED_STIMULUS_SETS:
+#     magnitude_block = magnitude_block_names[set_id]
+#     distribution_block = distribution_block_names[set_id]
+#     next_magnitude_blocks = [
+#         block_name
+#         for next_set_id, block_name in magnitude_block_names.items()
+#         if next_set_id != set_id
+#     ] or [magnitude_block]
 
-    blocks[magnitude_block] = dict(
-        stimulus_set=set_id,
-        conditions=[
-            condition_name
-            for condition_name, condition in magnitude_choice_trials.items()
-            if condition['stimulus_set'] == set_id
-        ],
-        length=MAGNITUDE_TRIALS_PER_STIMULUS_SET_BLOCK,
-        retry={'timeout': True},
-        transition=[{'next': distribution_block}],
-        method='random',
-    )
-    blocks[distribution_block] = dict(
-        stimulus_set=set_id,
-        conditions=[
-            condition_name
-            for condition_name, condition in distribution_choice_trials.items()
-            if condition['stimulus_set'] == set_id
-        ],
-        length=DISTRIBUTION_TRIALS_PER_STIMULUS_SET_BLOCK,
-        retry={'timeout': True},
-        transition=[{'next_from': next_magnitude_blocks}],
-        method='random',
-    )
+#     blocks[magnitude_block] = dict(
+#         stimulus_set=set_id,
+#         conditions=[
+#             condition_name
+#             for condition_name, condition in magnitude_choice_trials.items()
+#             if condition['stimulus_set'] == set_id
+#         ],
+#         length=MAGNITUDE_TRIALS_PER_STIMULUS_SET_BLOCK,
+#         retry={'timeout': True},
+#         transition=[{'next': distribution_block}],
+#         method='random',
+#     )
+#     blocks[distribution_block] = dict(
+#         stimulus_set=set_id,
+#         conditions=[
+#             condition_name
+#             for condition_name, condition in distribution_choice_trials.items()
+#             if condition['stimulus_set'] == set_id
+#         ],
+#         length=DISTRIBUTION_TRIALS_PER_STIMULUS_SET_BLOCK,
+#         retry={'timeout': True},
+#         transition=[{'next_from': next_magnitude_blocks}],
+#         method='random',
+#     )
+
+set_id = 3
+dist1 = '4'
+dist2 = '2'
+blocks[0] = dict(
+    stimulus_set=set_id,
+    conditions=[
+        f'set{set_id}_dist_{dist1}v{dist2}_loc{locs[0]}v{locs[1]}_winzone{winzone}'
+        for locs in location_pairs
+        for winzone in [4]
+    ],
+    length=10,
+    retry={'timeout': True},
+    transition=[{'next': 1}]
+)
+blocks[1] = dict(
+    stimulus_set=set_id,
+    conditions=[
+        f'set{set_id}_dist_{dist1}v{dist2}_loc{locs[0]}v{locs[1]}_winzone{winzone}'
+        for locs in location_pairs
+        for winzone in [4, 2]
+    ],
+    length=10,
+    retry={'timeout': True},
+    transition=[{'next': 1}]
+)
+blocks[2] = dict(
+    stimulus_set=set_id,
+    conditions=[
+        f'set{set_id}_dist_{dist1}v{dist2}_loc{locs[0]}v{locs[1]}_winzone{winzone}'
+        for locs in location_pairs
+        for dist1, dist2 in permutations(['4','2','g','h'], 2)
+        for winzone in [4, 2]
+    ],
+    length=10,
+    retry={'timeout': True},
+    transition=[{'next': 1}]
+)
+
 
 config['blocks'] = blocks
 
@@ -199,6 +254,10 @@ config['trial_types'] = {
         'module': 'trials/distribution_twoafc.py',
         'class': 'DistributionTwoAFCTrial',
     },
+    'winzone': {
+        'module': 'trials/winzone.py',
+        'class': 'WinZoneTrial',
+    }
 }
 config['hotkeys'] = {
     '4': {'do': 'pump_on'},
@@ -206,10 +265,32 @@ config['hotkeys'] = {
     '3': {'do': 'pause'},
     '7': {'do': 'unpause'},
     '5': {'do': 'quit'},
+    "n": {"do": "step_block", "direction": 1},
+    "b": {"do": "step_block", "direction": -1},
 }
 config['valid_times'] = [
     {'start': '08:00', 'end': '18:00'},
 ]
+
+BLOCK_ORDER = list(config['blocks'].keys())
+def step_block(scene, event):
+    blockmanager = scene.manager.blockmanager
+    if blockmanager is None:
+        raise ValueError("Block manager is not defined.")
+
+    current_block = blockmanager.current_block_name
+    if current_block not in BLOCK_ORDER:
+        raise ValueError(f"Current block {current_block!r} is not in BLOCK_ORDER.")
+
+    direction = event.get("direction", 1)
+    current_idx = BLOCK_ORDER.index(current_block)
+    next_idx = min(max(current_idx + direction, 0), len(BLOCK_ORDER) - 1)
+    next_block = BLOCK_ORDER[next_idx]
+
+    print(f"Updating to block: {next_block}")
+    blockmanager.set_block(next_block)
+
+config["actions"] = dict(step_block=step_block)
 
 if __name__ == '__main__':
     import pprint

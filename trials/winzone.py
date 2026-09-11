@@ -14,11 +14,11 @@ class WinZoneMethod(StrEnum):
     RANDOM = auto()
 
 class WinZoneTrial(DistributionTwoAFCTrial):
+    TRIAL_KIND='winzone'
     def __init__(
         self,
         winzone: int,
         winzone_method: WinZoneMethod,
-        jackpot_magnitude: float,
         distribution_options: Tuple[str, str],
         distribution_cues: Mapping[str, Mapping[str, Any]],
         magnitude_items: Mapping[int, str],
@@ -34,7 +34,6 @@ class WinZoneTrial(DistributionTwoAFCTrial):
     ):
         self.winzone = winzone
         self.winzone_method = winzone_method
-        self.jackpot_magnitude = jackpot_magnitude
         super().__init__(
             distribution_options=distribution_options,
             distribution_cues=distribution_cues,
@@ -54,14 +53,12 @@ class WinZoneTrial(DistributionTwoAFCTrial):
         return cls(
             winzone=config['winzone'],
             winzone_method=WinZoneMethod(config['winzone_method']),
-            jackpot_magnitude=config['jackpot_magnitude'],
             **super()._config_kwargs(config)
         )
     def trial_data(self) -> dict[str, Any]:
         data = super().trial_data()
         data['winzone'] = self.winzone
         data['winzone_method'] = str(self.winzone_method)
-        data['jackpot_magnitude'] = self.jackpot_magnitude
         return data
 
     def get_winzone_scene(self, mgr) -> tuple[Scene, TouchAdapter]:
@@ -82,6 +79,12 @@ class WinZoneTrial(DistributionTwoAFCTrial):
         data = self.trial_data()
         winzone_scene, winzone_tc = self.get_winzone_scene(mgr)
         scene, tc = self.get_choice_scene(mgr)
+        jackpot = self.get_reward_scene(
+            mgr,
+            self.magnitude_mapping["jackpot"],
+            "jackpot",
+            background=self.backgrounds['correct'],
+        )
 
         winzone_scene.run()
         data['winzone_RT'] = winzone_tc.RT
@@ -122,13 +125,12 @@ class WinZoneTrial(DistributionTwoAFCTrial):
             if outcome_scene.quit:
                 res.continue_session = False
                 return res
-
-            if data['sampled_magnitude'] == self.winzone:
+            deliver_jackpot = data.get('sampled_magnitude') == self.winzone
+            mgr.record(jackpot_delivered=deliver_jackpot)
+            if deliver_jackpot:
                 jackpot.run()
-            if jackpot.quit:
-                res.continue_session = False
-                return res
-            mgr.record(**data, outcome=res.outcome)
+                if jackpot.quit:
+                    res.continue_session = False
             return res
         elif self.winzone_method == WinZoneMethod.DETERMINISTIC:
             #TODO: check if the rationally optimal answer was chosen and only reinforce then

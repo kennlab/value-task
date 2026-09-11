@@ -10,6 +10,7 @@ from trials.twoafc import HIDDEN_PROGRESS_SIZE, TwoAFCTrial
 
 
 class DistributionTwoAFCTrial(TwoAFCTrial):
+    TRIAL_KIND='distribution_choice'
     def __init__(
         self,
         distribution_options: Tuple[str, str],
@@ -31,7 +32,7 @@ class DistributionTwoAFCTrial(TwoAFCTrial):
             for cue_id, cue in distribution_cues.items()
         }
         self.magnitude_items = {
-            int(magnitude): image
+            int(magnitude) if magnitude != "jackpot" else "jackpot": image
             for magnitude, image in magnitude_items.items()
         }
         self._validate_distribution_options()
@@ -115,7 +116,7 @@ class DistributionTwoAFCTrial(TwoAFCTrial):
 
     def trial_data(self) -> dict[str, Any]:
         return {
-            "trial_kind": "distribution_choice",
+            "trial_kind": self.TRIAL_KIND,
             "distribution_options": self.distribution_options,
             "distribution_images": self.options,
             "distribution_probabilities": {
@@ -158,7 +159,7 @@ class DistributionTwoAFCTrial(TwoAFCTrial):
         )
 
     def get_reward_scene(self, mgr, reward_params, magnitude_level, background) -> Scene:
-        sampled_image = self.magnitude_items[int(magnitude_level)]
+        sampled_image = self.magnitude_items[int(magnitude_level) if magnitude_level!="jackpot" else "jackpot"]
         rew = RewardAdapter.from_manager(
             manager=mgr,
             channels=self.reward_channels,
