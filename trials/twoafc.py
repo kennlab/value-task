@@ -1,8 +1,8 @@
 from experiment.trial import Trial, TrialResult
-from experiment.experiments.adapters import ImageAdapter, TouchAdapter, RewardAdapter, TimeCounter, RectAdapter
+from experiment.experiments.adapters import BaseAdapter, ImageAdapter, TouchAdapter, RewardAdapter, TimeCounter, RectAdapter
 from experiment.experiments.scene import Scene
 from experiment.util.bbox import T_BBOX_SPEC
-from typing import Any, Optional, Tuple
+from typing import Any, Optional, Sequence, Tuple
 
 INTERPULSE_INTERVAL = 0.2
 REWARD_BAR_WIDTH = 0.0833333333
@@ -15,6 +15,7 @@ HIDDEN_PROGRESS_SIZE = (0.001, 0.001)
 class TwoAFCTrial(Trial):
     TRIAL_KIND = "magnitude_choice"
     CHOICE_NAMES = ('option1', 'option2')
+    DEFAULT_BACKGROUND = (200, 200, 200)
     DEFAULT_MAGNITUDE_MAPPING = {
         1: {'duration': 1},
         2: {'duration': 1.5},
@@ -31,9 +32,9 @@ class TwoAFCTrial(Trial):
 
     def __init__(
         self,
-        options: Tuple[str, str],
-        magnitudes: Tuple[int, int],
-        locs: Tuple[Tuple[float, float], Tuple[float, float]],
+        options: Tuple[str, ...],
+        magnitudes: Tuple[int, ...],
+        locs: Tuple[Tuple[float, float], ...],
         magnitude_mapping=None,
         duration: float = 5.0,
         size: Tuple[float, float] = (200, 200),
@@ -49,6 +50,7 @@ class TwoAFCTrial(Trial):
         self.options = options
         self.magnitudes = magnitudes
         self.locs = locs
+        self._validate_choices()
         self.magnitude_mapping = magnitude_mapping or self.DEFAULT_MAGNITUDE_MAPPING
         self.size = size
         self.duration = duration
@@ -64,6 +66,13 @@ class TwoAFCTrial(Trial):
         self.reward_feedback_method = reward_feedback_method
         self.coordinate_space = coordinate_space
         self.stimulus_set = stimulus_set
+
+    def _validate_choices(self) -> None:
+        choice_count = len(self.options)
+        if choice_count not in (1, 2):
+            raise ValueError("Choice trials require one or two options.")
+        if len(self.magnitudes) != choice_count or len(self.locs) != choice_count:
+            raise ValueError("Options, magnitudes, and locations must have matching lengths.")
 
     @staticmethod
     def parse_magnitude_level(magnitude):
@@ -118,24 +127,35 @@ class TwoAFCTrial(Trial):
     def build_targets(self) -> dict[str, ImageAdapter]:
         return {
             choice_name: ImageAdapter(
-                image=self.options[index],
-                position=self.locs[index],
+                image=image,
+                position=loc,
                 size=self.size,
                 coordinate_space=self.coordinate_space,
                 bbox=self.bbox,
             )
-            for index, choice_name in enumerate(self.CHOICE_NAMES)
+            for choice_name, image, loc in zip(self.CHOICE_NAMES, self.options, self.locs)
         }
 
-    def get_choice_scene(self, mgr) -> tuple[Scene, TouchAdapter]:
+    def get_choice_scene(
+        self,
+        mgr,
+        aux_adapters: Optional[Sequence[BaseAdapter]] = None,
+    ) -> tuple[Scene, TouchAdapter]:
         tc = TouchAdapter(
             time_counter=self.duration,
             items=self.build_targets(),
             allow_outside_touch=True,
         )
-        return Scene(mgr, adapter=tc), tc
+        return Scene(
+            mgr,
+            adapter=tc,
+            aux_adapters=list(aux_adapters or ()),
+            background=self.DEFAULT_BACKGROUND,
+        ), tc
 
     def correct_choice(self) -> str:
+        if len(self.magnitudes) == 1:
+            return self.CHOICE_NAMES[0]
         return 'option1' if self.magnitudes[0] > self.magnitudes[1] else 'option2'
 
     def result_for_choice(self, chosen: str, data: dict[str, Any]) -> TrialResult:
@@ -182,27 +202,36 @@ class TwoAFCTrial(Trial):
             )
         return kwargs
 
-    def get_reward_scene(self, mgr, reward_params, magnitude_level, background) -> Scene:
+    def get_reward_scene(
+        self,
+        mgr,
+        reward_params,
+        magnitude_level,
+        background,
+        aux_adapters: Optional[Sequence[BaseAdapter]] = None,
+    ) -> Scene:
         rew = RewardAdapter.from_manager(
             manager=mgr,
             channels=self.reward_channels,
             **reward_params,
             **self.reward_adapter_kwargs(magnitude_level),
         )
-        return Scene(mgr, rew, background=background)
+        return Scene(mgr, rew, aux_adapters=list(aux_adapters or ()), background=background)
 
     def outcome_scene_for_result(
         self,
         mgr,
         result: TrialResult,
         chosen: str | None,
-        data: dict[str, Any]
+        data: dict[str, Any],
+        aux_adapters: Optional[Sequence[BaseAdapter]] = None,
     ) -> Scene:
         reward_params = self.reward_params_for_choices()
         if result.outcome == 'timeout':
             return Scene(
                 mgr,
                 adapter=TimeCounter(self.timeout_duration),
+                aux_adapters=list(aux_adapters or ()),
                 background=self.backgrounds['timeout'],
             )
 
@@ -217,6 +246,7 @@ class TwoAFCTrial(Trial):
             chosen_reward,
             chosen_mag_level,
             background=background,
+            aux_adapters=aux_adapters,
         )
 
     def run(self, mgr) -> TrialResult:

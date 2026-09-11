@@ -35,7 +35,7 @@ MAGNITUDES = tuple(range(1, 6))
 ENABLED_STIMULUS_SETS = (3,)
 MAGNITUDE_TRIALS_PER_STIMULUS_SET_BLOCK = 1
 DISTRIBUTION_TRIALS_PER_STIMULUS_SET_BLOCK = 10
-DISTRIBUTION_CUE_IDS = ('a', 'b', 'd', 'e', 'f', '2', '4')
+DISTRIBUTION_CUE_IDS = ('a', 'b', 'd', 'e', 'f', '2', '4', 'h', 'g')
 
 config: Dict[str, Any] = dict(
     name='fleabottom_distribution',
@@ -45,6 +45,8 @@ config: Dict[str, Any] = dict(
     size=STIMULUS_SIZE,
     bbox=STIMULUS_BBOX,
     allow_outside_touch=True,
+    persist_winzone_cue=True,
+    winzone_loc=[0, .65],
     ITI=1.5,
     cue_incorrect=True,
     reward_feedback_method='bar_height',
@@ -159,7 +161,28 @@ winzone_trials = {
     for winzone in MAGNITUDES
 }
 
-config['conditions'] = {**magnitude_choice_trials, **distribution_choice_trials, **winzone_trials}
+winzone_trials_forced = {
+    f'set{set_id}_forced_{dist}_loc{loc}_winzone{winzone}': dict(
+        winzone=winzone,
+        winzone_method='random',
+        stimulus_set=set_id,
+        items=STIMULUS_SETS[set_id],
+        distribution_options=(dist,),
+        locs=(loc,),
+        trial_type='winzone',
+    )
+    for set_id in ENABLED_STIMULUS_SETS
+    for dist, loc in product(DISTRIBUTION_CUE_IDS, locations)
+    for winzone in MAGNITUDES
+}
+
+
+config['conditions'] = {
+    **magnitude_choice_trials,
+    **distribution_choice_trials,
+    **winzone_trials,
+    **winzone_trials_forced
+}
 
 magnitude_block_names = {
     set_id: f'stimulus_set_{set_id}_magnitude'
@@ -215,32 +238,67 @@ blocks[0] = dict(
         for locs in location_pairs
         for winzone in [4]
     ],
-    length=10,
+    length=5,
     retry={'timeout': True},
     transition=[{'next': 1}]
 )
 blocks[1] = dict(
     stimulus_set=set_id,
     conditions=[
-        f'set{set_id}_dist_{dist1}v{dist2}_loc{locs[0]}v{locs[1]}_winzone{winzone}'
-        for locs in location_pairs
-        for winzone in [4, 2]
+        f'set{set_id}_forced_{dist}_loc{loc}_winzone{winzone}'
+        for loc in locations
+        for dist, winzone in [('4', 4), ('2', 2)]
     ],
-    length=10,
+    length=5,
     retry={'timeout': True},
-    transition=[{'next': 1}]
+    transition=[{'next': 2}]
 )
+# blocks[2] = dict(
+#     stimulus_set=set_id,
+#     conditions=[
+#         f'set{set_id}_forced_{dist}_loc{loc}_winzone{winzone}'
+#         for loc in locations
+#         for dist in ['4', '2']
+#         for winzone in [4, 2]
+#     ],
+#     length=10,
+#     retry={'timeout': True},
+#     transition=[{'next': 1}]
+# )
 blocks[2] = dict(
     stimulus_set=set_id,
     conditions=[
         f'set{set_id}_dist_{dist1}v{dist2}_loc{locs[0]}v{locs[1]}_winzone{winzone}'
         for locs in location_pairs
-        for dist1, dist2 in permutations(['4','2','g','h'], 2)
+        for dist1, dist2 in permutations(['4','2'], 2)
         for winzone in [4, 2]
     ],
     length=10,
     retry={'timeout': True},
-    transition=[{'next': 1}]
+    transition=[{'next': 3}]
+)
+blocks[3] = dict(
+    stimulus_set=set_id,
+    conditions=[
+        f'set{set_id}_dist_{dist1}v{dist2}_loc{locs[0]}v{locs[1]}'
+        for locs in location_pairs
+        for dist1, dist2 in permutations(['g','h'], 2)
+    ],
+    length=30,
+    retry={'timeout': True},
+    transition=[{'next': 4}]
+)
+blocks[4] = dict(
+    stimulus_set=set_id,
+    conditions=[
+        f'set{set_id}_dist_{dist1}v{dist2}_loc{locs[0]}v{locs[1]}_winzone{winzone}'
+        for locs in location_pairs
+        for dist1, dist2 in permutations(['g','h'], 2)
+        for winzone in [4, 2]
+    ],
+    length=30,
+    retry={'timeout': True},
+    transition=[{'next': 2}]
 )
 
 

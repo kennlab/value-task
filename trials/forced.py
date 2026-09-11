@@ -9,6 +9,7 @@ REWARD_PROGRESS_SIZE = (0.4166666667, 0.0925925926)
 REWARD_PROGRESS_GAP = 0.0185185185
 
 class ForcedChoiceTrial(Trial):
+    DEFAULT_BACKGROUND = (16, 48, 32)
     DEFAULT_MAGNITUDE_MAPPING = {
         1: {'duration': 1},
         2: {'duration': 1.5},
@@ -117,7 +118,7 @@ class ForcedChoiceTrial(Trial):
             items={'target': target},
             allow_outside_touch=self.allow_outside_touch
         )
-        scene = Scene(mgr, adapter=tc)
+        scene = Scene(mgr, adapter=tc, background=self.DEFAULT_BACKGROUND)
         reward_scene = self.get_reward_scene(mgr, reward_params)
         incorrect_scene = Scene(mgr, adapter=TimeCounter(self.error_duration), background=self.backgrounds['incorrect'])
         timeout_scene = Scene(mgr, adapter=TimeCounter(self.timeout_duration), background=self.backgrounds['timeout'])

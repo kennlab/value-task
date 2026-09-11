@@ -1,7 +1,7 @@
 import random
-from typing import Any, Mapping, Optional, Tuple
+from typing import Any, Mapping, Optional, Sequence, Tuple
 
-from experiment.experiments.adapters import ImageAdapter, RewardAdapter, TimeCounter
+from experiment.experiments.adapters import BaseAdapter, ImageAdapter, RewardAdapter, TimeCounter
 from experiment.experiments.scene import Scene
 from experiment.trial import TrialResult
 from experiment.util.bbox import T_BBOX_SPEC
@@ -11,12 +11,13 @@ from trials.twoafc import HIDDEN_PROGRESS_SIZE, TwoAFCTrial
 
 class DistributionTwoAFCTrial(TwoAFCTrial):
     TRIAL_KIND='distribution_choice'
+    DEFAULT_BACKGROUND = (200, 200, 200)
     def __init__(
         self,
-        distribution_options: Tuple[str, str],
+        distribution_options: Tuple[str, ...],
         distribution_cues: Mapping[str, Mapping[str, Any]],
         magnitude_items: Mapping[int, str],
-        locs: Tuple[Tuple[float, float], Tuple[float, float]],
+        locs: Tuple[Tuple[float, float], ...],
         magnitude_mapping=None,
         duration: float = 5.0,
         size: Tuple[float, float] = (200, 200),
@@ -42,7 +43,7 @@ class DistributionTwoAFCTrial(TwoAFCTrial):
         )
         super().__init__(
             options=cue_images,
-            magnitudes=(0, 0),
+            magnitudes=(0,) * len(self.distribution_options),
             locs=locs,
             magnitude_mapping=magnitude_mapping,
             duration=duration,
@@ -158,7 +159,14 @@ class DistributionTwoAFCTrial(TwoAFCTrial):
             data=data,
         )
 
-    def get_reward_scene(self, mgr, reward_params, magnitude_level, background) -> Scene:
+    def get_reward_scene(
+        self,
+        mgr,
+        reward_params,
+        magnitude_level,
+        background,
+        aux_adapters: Optional[Sequence[BaseAdapter]] = None,
+    ) -> Scene:
         sampled_image = self.magnitude_items[self.parse_magnitude_level(magnitude_level)]
         rew = RewardAdapter.from_manager(
             manager=mgr,
@@ -180,19 +188,26 @@ class DistributionTwoAFCTrial(TwoAFCTrial):
                 coordinate_space=self.coordinate_space,
             ),
         )
-        return Scene(mgr, rew, background=background)
+        return Scene(
+            mgr,
+            rew,
+            aux_adapters=list(aux_adapters or ()),
+            background=background,
+        )
 
     def outcome_scene_for_result(
         self,
         mgr,
         result: TrialResult,
         chosen: str | None,
-        data: dict[str, Any]
+        data: dict[str, Any],
+        aux_adapters: Optional[Sequence[BaseAdapter]] = None,
     ) -> Scene:
         if result.outcome == 'timeout':
             return Scene(
                 mgr,
                 adapter=TimeCounter(self.timeout_duration),
+                aux_adapters=list(aux_adapters or ()),
                 background=self.backgrounds['timeout'],
             )
         return self.get_reward_scene(
@@ -200,4 +215,5 @@ class DistributionTwoAFCTrial(TwoAFCTrial):
             data['sampled_reward_params'],
             data['sampled_magnitude'],
             background=self.backgrounds['correct'],
+            aux_adapters=aux_adapters,
         )
